@@ -1,1 +1,1 @@
-# Spatial-temporal-modeling-and-testing-of-climate-data
+# Spatial-temporal modeling and testing of climate data

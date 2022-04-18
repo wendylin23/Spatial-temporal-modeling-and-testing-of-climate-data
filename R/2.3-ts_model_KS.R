@@ -22,7 +22,8 @@ library(tseries)
 library(RColorBrewer)
 library(dglm)
 library(quantreg)
-setwd("~/Dropbox/UCSD/Thesis/3.Precipitation/Code")
+code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
+setwd(code_path)
 source("varx_fixed.R")
 source("util.R")
 

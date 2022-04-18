@@ -22,7 +22,8 @@ library(tseries)
 library(RColorBrewer)
 library(dglm)
 library(quantreg)
-setwd("~/Dropbox/UCSD/Thesis/3.Precipitation/Code")
+code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
+setwd(code_path)
 source("varx_fixed.R")
 source("util.R")
 
@@ -32,7 +33,6 @@ source("util.R")
 tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tas-rcp85-mon-44i/"
 pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/pr-rcp85-mon-44i/"
 map_path = "/Users/wenyilin/Documents/R/NA-CORDEX/map/"
-code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
 res_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/"
 load(paste0(map_path,"co_elevation.rdata"))
 tas_hist_co_all = list.files(path = tas_path,pattern = "^tas_co_tas.hist")

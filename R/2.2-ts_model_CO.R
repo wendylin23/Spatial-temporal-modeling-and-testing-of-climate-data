@@ -12,7 +12,7 @@ library(sp)
 library(gstat)
 library(fields)
 library(MBA)
-#library(Vizumap)
+library(Vizumap)
 library(nlme)
 library(autoimage)
 library(FRK)
@@ -24,105 +24,96 @@ library(dglm)
 library(quantreg)
 setwd("~/Dropbox/UCSD/Thesis/3.Precipitation/Code")
 source("varx_fixed.R")
-
-## get aspect ratio from lon/lat
-map_aspect = function(x, y) {
-  x.center <- sum(range(x)) / 2
-  y.center <- sum(range(y)) / 2
-  x.dist <- ggplot2:::dist_central_angle(x.center + c(-0.5, 0.5), rep(y.center, 2))
-  y.dist <- ggplot2:::dist_central_angle(rep(x.center, 2), y.center + c(-0.5, 0.5))
-  y.dist / x.dist
-}
-
-durbinWatsonTest.r <- function(resid, max.lag=1){
-  n <-  length(resid)
-  dw <- rep(0, max.lag)
-  den <- sum(resid^2)
-  for (lag in 1:max.lag){
-    dw[lag] <- (sum((resid[(lag+1):n] - resid[1:(n-lag)])^2))/den
-  }
-  dw
-}
-
-durbinWatsonTest.glm <- function(model, max.lag=1, simulate=TRUE, reps=1000, 
-                                 method="resample", 
-                                 alternative="two.sided"){
-  resid <- residuals(model)
-  if (any(is.na(resid))) stop ('residuals include missing values')
-  n <- length(resid)
-  r <- dw <-rep(0, max.lag)
-  den <- sum(resid^2)
-  for (lag in 1:max.lag){
-    dw[lag] <- (sum((resid[(lag+1):n] - resid[1:(n-lag)])^2))/den
-    r[lag] <- (sum(resid[(lag+1):n]*resid[1:(n-lag)]))/den
-  }
-  if (!simulate){
-    result <- list(r=r, dw=dw)
-    result
-  }
-  else {
-    X <- model.matrix(model)
-    mu <- fitted.values(model)
-    Y <-  matrix(sample(resid, n*reps, replace=TRUE), n, reps) + matrix(mu, n, reps)
-    E <- apply(Y, 2, function(y) residuals(glm(y[y>0] ~ X[y>0,], family=Gamma(link = "log"))))
-    if(is.list(E))
-    {
-      DW = unlist(lapply(E, function(x) durbinWatsonTest.r(x,max.lag=max.lag)))
-    }else
-      DW <- apply(E, 2, durbinWatsonTest.r, max.lag=max.lag)
-    if (max.lag == 1) DW <- rbind(DW)
-    p <- rep(0, max.lag)
-    if (alternative == 'two.sided'){
-      for (lag in 1:max.lag) {
-        p[lag] <- (sum(dw[lag] < DW[lag,]))/reps
-        p[lag] <- 2*(min(p[lag], 1 - p[lag]))
-      }
-    }
-    else if (alternative == 'positive'){
-      for (lag in 1:max.lag) {
-        p[lag] <- (sum(dw[lag] > DW[lag,]))/reps
-      }
-    }
-    else {
-      for (lag in 1:max.lag) {
-        p[lag] <- (sum(dw[lag] < DW[lag,]))/reps
-      }
-    }
-    result <- list(r=r, dw=dw, p=p, alternative=alternative)
-    result
-  }
-}
+source("util.R")
 
 #####################################
 ############## Load data ############
 #####################################
-tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tas-rec-rcp85-mon-44i/"
-pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/pr-rec-rcp85-mon-44i/"
+tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tas-rcp85-mon-44i/"
+pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/pr-rcp85-mon-44i/"
 map_path = "/Users/wenyilin/Documents/R/NA-CORDEX/map/"
 code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
 res_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/"
-load(paste0(res_path,"summary_results_20211101/ks_data.rdata"))
+load(paste0(map_path,"co_elevation.rdata"))
+tas_hist_co_all = list.files(path = tas_path,pattern = "^tas_co_tas.hist")
+pr_hist_co_all = list.files(path = pr_path,pattern = "^pr_co_pr.hist")
+### example analysis for CO
+tas_hist_co = readRDS(file = paste0(tas_path,tas_hist_co_all[1]))
+pr_hist_co = readRDS(file = paste0(pr_path,pr_hist_co_all[1]))
+co_elevation$ele_std = (co_elevation$elevation_geonames - min(co_elevation$elevation_geonames))/(max(co_elevation$elevation_geonames)-min(co_elevation$elevation_geonames))
+co_elevation$ele_norm = (co_elevation$elevation_geonames - mean(co_elevation$elevation_geonames))/1000
 
-#####################################
-############ Load data ##############
-#####################################
-
+## seasonal tas data
 time_dat = data.frame(year = rep(1950:2005,each=12),
-                     month = rep(1:12,56),
-                     ts.point = 1:(12*56))  ## historical measures
-time_rcp = data.frame(year = rep(2006:2100,each=12),
-                      month = rep(1:12,95),
-                      ts.point = 1:(12*95))
-## temperature
-gls.tas.summary = ks_data$gls.tas.summary
-gls.tas.rcp = ks_data$gls.tas.rcp
+                      month = rep(1:12,56),
+                      ts.point = 1:(12*56))
+gls.dat = data.frame(lat = co_elevation[,1], lon = co_elevation[,2],
+                     elevation = co_elevation$ele_norm,
+                     tas = tas_hist_co,
+                     loc = as.factor(1:length(co_elevation[,1])))
+gls.dat.long = reshape2::melt(gls.dat,id.vars = c("lon","lat","elevation","loc"))
+names(gls.dat.long) = c("lon","lat","elevation","loc","ts.point","tas")
+gls.dat.long$ts.point = as.numeric(gsub("\\D", "", gls.dat.long$ts.point))
+gls.dat.long = merge(gls.dat.long,time_dat, by.x = "ts.point",all.x = TRUE)
+gls.dat.summary = as.data.frame(gls.dat.long %>% 
+                                  filter(month %in% c(1,2,3)) %>%
+                                  group_by(lon,lat,elevation,loc,year) %>%
+                                  dplyr::summarise(winter = mean(tas))
+)
+gls.dat.summary$spring = as.data.frame(gls.dat.long %>% 
+                                         filter(month %in% c(4,5,6)) %>%
+                                         group_by(lon,lat,elevation,loc,year) %>%
+                                         dplyr::summarise(spring = mean(tas))
+)$spring
 
-## precipitation
-gls.pr.summary = ks_data$gls.pr.summary
-gls.pr.rcp = ks_data$gls.pr.rcp
+gls.dat.summary$summer = as.data.frame(gls.dat.long %>% 
+                                         filter(month %in% c(7,8,9)) %>%
+                                         group_by(lon,lat,elevation,loc,year) %>%
+                                         dplyr::summarise(summer = mean(tas))
+)$summer
 
-## location and elevation
-ks_elevation = ks_data$ks_elevation
+gls.dat.summary$fall = as.data.frame(gls.dat.long %>% 
+                                       filter(month %in% c(10,11,12)) %>%
+                                       group_by(lon,lat,elevation,loc,year) %>%
+                                       dplyr::summarise(fall = mean(tas))
+)$fall
+gls.tas.summary = gls.dat.summary[order(gls.dat.summary$loc,gls.dat.summary$year),]
+
+## seasonal pre data
+time_dat = data.frame(year = rep(1950:2005,each=12),
+                      month = rep(1:12,56),
+                      ts.point = 1:(12*56))
+gls.dat = data.frame(lat = co_elevation[,1], lon = co_elevation[,2],
+                     elevation = co_elevation$ele_norm,
+                     tas = pr_hist_co*86400*30,
+                     loc = as.factor(1:length(co_elevation[,1])))
+gls.dat.long = reshape2::melt(gls.dat,id.vars = c("lon","lat","elevation","loc"))
+names(gls.dat.long) = c("lon","lat","elevation","loc","ts.point","tas")
+gls.dat.long$ts.point = as.numeric(gsub("\\D", "", gls.dat.long$ts.point))
+gls.dat.long = merge(gls.dat.long,time_dat, by.x = "ts.point",all.x = TRUE)
+gls.dat.summary = as.data.frame(gls.dat.long %>% 
+                                  filter(month %in% c(1,2,3)) %>%
+                                  group_by(lon,lat,elevation,loc,year) %>%
+                                  dplyr::summarise(winter = mean(tas))
+)
+gls.dat.summary$spring = as.data.frame(gls.dat.long %>% 
+                                         filter(month %in% c(4,5,6)) %>%
+                                         group_by(lon,lat,elevation,loc,year) %>%
+                                         dplyr::summarise(spring = mean(tas))
+)$spring
+
+gls.dat.summary$summer = as.data.frame(gls.dat.long %>% 
+                                         filter(month %in% c(7,8,9)) %>%
+                                         group_by(lon,lat,elevation,loc,year) %>%
+                                         dplyr::summarise(summer = mean(tas))
+)$summer
+
+gls.dat.summary$fall = as.data.frame(gls.dat.long %>% 
+                                       filter(month %in% c(10,11,12)) %>%
+                                       group_by(lon,lat,elevation,loc,year) %>%
+                                       dplyr::summarise(fall = mean(tas))
+)$fall
+gls.pr.summary = gls.dat.summary[order(gls.dat.summary$loc,gls.dat.summary$year),]
 
 #####################################
 ###########  plotting ###############
@@ -130,27 +121,19 @@ ks_elevation = ks_data$ks_elevation
 
 ## basic definitions
 season.var = c("winter","spring","summer","fall" )
-loc.names = c("Kansas City","Wichita","Oakley")
-select.loc = data.frame(kc = c(39.25,-94.75), wi = c(37.75,-97.25),
-                        oa = c(39.25,-100.75))
-select.ind = c(75,25,63)
+loc.names = c("Denver","Aspen","Grand Junction")
+select.loc = data.frame(dv = c(39.75,-104.75), ap = c(39.25,-106.75),
+                        gj = c(39.25,-108.75))
+select.ind = c(79,61,57)
 select.loc.col = c("red","green","blue")
-sub.loc = list(x = c(-94.97,-97.25,-100.75), 
-               y = c(39.25,37.75,39.25),
+sub.loc = list(x = c(-104.75,-106.75,-108.75), 
+               y = c(39.75,39.25,39.25),
                labels = loc.names)
-n.season = length(season.var)
-n.loc = length(unique(gls.tas.summary$loc))
-time.yr = (range(gls.tas.summary$year)[1] : range(gls.tas.summary$year)[2])
-time.rcp.yr = (range(gls.tas.rcp$year)[1] : range(gls.tas.rcp$year)[2])
-#time.pts = c(time.yr - mean(time.yr))/sd(time.yr)
-time.pts = c(time.yr - mean(time.yr))/10
-time.rcp.pts = c(time.rcp.yr - mean(time.rcp.yr))/10
-n.time = length(time.pts)
-n.rcp.time = length(time.rcp.pts)
 
-gls.tas.summary$time.pts = time.pts
-gls.tas.rcp$time.pts = time.rcp.pts
-gls.tas.all = rbind(gls.tas.summary,gls.tas.summary)
+### Seasonal example
+#### Display in map
+as = list(x = c(-123), y = c(36),
+          labels = paste0("ASRatio=",round(asratio,2)))
 
 ## color map
 cmap <- colorRampPalette(rev(brewer.pal(11, "RdBu")))
@@ -158,9 +141,9 @@ rev.cmap <- colorRampPalette(brewer.pal(11, "RdBu"))
 neg_cmap = colorRampPalette(rev(brewer.pal(11, "RdBu"))[1:6]) ## all blue
 pos_cmap = colorRampPalette(rev((brewer.pal(11, "RdBu"))[1:6])) ## all red
 
-#png("figures/tas_4season_map.png",width = 250, height = 100, res = 100,units = "in")
+## spatial seasonal trend
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(co_elevation$longitude,co_elevation$latitude,
           gls.tas.summary[gls.tas.summary$year==1992,season.var],
           interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
@@ -172,28 +155,75 @@ autoimage(ks_elevation$longitude,ks_elevation$latitude,
           points.args = list(pch = 20, col = "white"),
           text = sub.loc,
           text.args = list(pos = 3, col = "darkgreen",cex=1.1),
-          zlim = c(-10,32),
+          zlim = c(-12,32),
           col=cmap(200),
           size = c(2, 2), lratio = 0.25,
           legend = "vertical")
 
-## temporal seasonal trend
-### historical trends
+par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
+autoimage(co_elevation$longitude,co_elevation$latitude,
+          gls.pr.summary[gls.pr.summary$year==1992,season.var],
+          interp.args = list(no.X = 200, no.Y = 200),
+          map = "county",ylab = "Latitude",xlab = "Longitude",
+          main = season.var,
+          outer.title = "Average seasonal temperature (C) in 1992",
+          mtext.args = list(cex = 1),
+          legend.axis.args = list(cex.axis=1),
+          zlim = c(0,160),
+          col=rev.cmap(200),
+          size = c(2, 2), lratio = 0.25,
+          legend = "vertical")
+
+#### Display in time series
+n.season = length(season.var)
+n.loc = length(unique(gls.tas.summary$loc))
+time.yr = (range(gls.tas.summary$year)[1] : range(gls.tas.summary$year)[2])
+time.pts = c(time.yr - mean(time.yr))/sd(time.yr)
+n.time = length(time.pts)
+
 par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
 for(s in 1:length(select.ind))
 {
   tas.dat = ts(gls.tas.summary[gls.tas.summary$loc==select.ind[s],season.var[1]],start = 1950)
   plot(tas.dat, ylim = range(gls.tas.summary[,season.var]), main = loc.names[s],
        xlab = "Year", ylab = "Average temperature")
-  for(i in 2: length(season.var))
+  for(i in 2: n.season)
   {
     tas.dat = ts(gls.tas.summary[gls.tas.summary$loc==select.ind[s],season.var[i]],start = 1950)
     lines(tas.dat, ylim = range(gls.tas.summary[,season.var]),col=i)
   }
+  #if(s==1){
+  #  legend("topright",bty='n', xpd=NA,cex = 0.8,
+  #       legend=var.names,lty = 1, col=1:length(var.names))
+  #}
+  #{legend(par('usr')[2], par('usr')[4],bty='n', xpd=NA,cex = 0.8,
+  #       legend=var.names,lty = 1, col=1:length(var.names))}
 }
-legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
-       legend=season.var,lty = 1, col=1:length(season.var))
-mtext("Average seasonal temperature (C) at three typical locations", outer = TRUE, cex = 1.2)
+legend(par('usr')[2], par('usr')[4]*2, bty='n', xpd=NA,cex = 1.1,
+       legend=season.var,lty = 1, col=1:n.season)
+mtext("Average seasonal temperature (C) at four typical locations", outer = TRUE, cex = 1.1)
+
+par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
+for(s in 1:length(select.ind))
+{
+  tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[1]],start = 1950)
+  plot(tas.dat, ylim = c(0,300), main = loc.names[s],
+       xlab = "Year", ylab = "Average precipitation (mm/month)")
+  for(i in 2: length(season.var))
+  {
+    tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[i]],start = 1950)
+    lines(tas.dat,col=i)
+  }
+  #if(s==1){
+  #  legend("topright",bty='n', xpd=NA,cex = 0.8,
+  #         legend=var.names,lty = 1, col=1:length(var.names))
+  #}
+  #{legend(par('usr')[2], par('usr')[4],bty='n', xpd=NA,cex = 0.8,
+  #       legend=var.names,lty = 1, col=1:length(var.names))}
+}
+legend(par('usr')[2], par('usr')[4]*2, bty='n', xpd=NA,cex = 1.1,
+       legend=season.var,lty = 1, col=1:n.season)
+mtext("Average seasonal precipitation (mm/month) at four typical locations", outer = TRUE, cex = 1.1)
 
 #####################################
 ######### TS model selection ########
@@ -321,7 +351,7 @@ for(i in 1:n.loc)
   {
     tas_exp = gls.pr.summary[gls.pr.summary$loc==i,season.var[j]]
     glm.fit = glm(tas_exp ~ time.pts, family=Gamma(link = "log"))
-    resid_mat[i,j,] = residuals(glm.fit, type = c("deviance"))
+    resid_mat[i,j,] = residuals(glm.fit,type="deviance")
     dw_res = durbinWatsonTest.glm(glm.fit)
     dw_p[i,j] = dw_res$p
     dw_val[i,j] = dw_res$dw
@@ -333,7 +363,7 @@ for(i in 1:n.loc)
 }
 
 dw_all = list(dw_p = dw_p, dw_val = dw_val)
-#save(dw_all,file = paste0(res_path,"ks_pre_dw_p.rdata"))
+#save(dw_all,file = paste0(res_path,"co_pre_dw_p.rdata"))
 boxplot(lm_pacf, ylim = c(-acf_sig-0.1,acf_sig+0.1))
 abline(h = acf_sig,col="red",lty=2)
 abline(h = -acf_sig,col="red",lty=2)
@@ -379,8 +409,8 @@ for(i in 1:n.loc)
   fixed_beta2 = rbind(matrix(1,nrow = 2,ncol = 4),
                       c(1,0,0,0),
                       c(0,1,0,0),
-                      c(0,0,1,0),
-                      c(0,0,0,1))
+                      c(0,0,1,1),
+                      c(0,0,0,0))
   m_ar0_cor2 = varx_fixed(tas_exp[-1,],p=0,xt = x_multi,fixed = fixed_beta2)
   beta_est[i,] = m_ar0_cor2$beta[,1]
   beta_se[i,] = m_ar0_cor2$se.beta[,1]
@@ -394,36 +424,39 @@ for(i in 1:n.loc)
   #resids_c = center_apply(m_ar0_cor2$residuals)
   sresids[i,,] = t((chol(solve(m_ar0_cor2$Sigma)))%*% t(m_ar0_cor2$residuals))
 }
+cmap <- colorRampPalette(rev(brewer.pal(11, "RdBu")))
 
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(coords_ca$longitude,coords_ca$latitude,
           beta_est,
           # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
           main = season.var,
-          outer.title = "Estimated slopes (C/decade) of four seasons",
+          outer.title = "Estimated slopes of four seasons",
           mtext.args = list(cex = 1),
           #text = as,
           #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-0.3,0.3),
+          size = c(1, 4), lratio = 0.35,
+          col=cmap(100),
+          zlim = c(-1,1),
           legend = "vertical")
 
 z_score = beta_est/beta_se
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(coords_ca$longitude,coords_ca$latitude,
           z_score,
           # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
           main = season.var,
           outer.title = "Z_scores of estimated slopes of four seasons",
           mtext.args = list(cex = 1),
+          #text = as,
+          #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
-          size = c(2,2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-2.5,2.5),
+          size = c(1,4), lratio = 0.35,
+          col=cmap(100),
+          zlim = c(-5.5,5.5),
           legend = "vertical")
 
 ### precipitation
@@ -445,35 +478,37 @@ for(i in 1:n.loc)
   }
 }
 
+cmap <- colorRampPalette(brewer.pal(11, "RdBu"))
+
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(coords_ca$longitude,coords_ca$latitude,
           slope_est,
           #interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
           main = season.var,
-          outer.title = "Estimated slopes (mm/month/10 years) of four seasons",
+          outer.title = "Estimated slopes (gamma regression) of four seasons",
           mtext.args = list(cex = 1),
           #text = as,
           #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
-          col=rev.cmap(100),
-          zlim = c(-0.1,0.1),
-          size = c(2,2), lratio = 0.25,
+          size = c(1,4), lratio = 0.35,
+          col=cmap(100),
+          zlim = c(-0.4,0.4),
           legend = "vertical")
 
 z_score = slope_est/slope_se
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(coords_ca$longitude,coords_ca$latitude,
           z_score,
           # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
           main = season.var,
-          outer.title = "Z-scores of estimated slopes of four seasons",
+          outer.title = "Z-scores of estimated slopes (gamma regression)",
           mtext.args = list(cex = 1),
           #text = as,
-          #text.args = list(cex=2),
+          #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=rev.cmap(100),
-          zlim = c(-2.5,2.5),
+          size = c(1,4), lratio = 0.35,
+          col=cmap(100),
+          zlim = c(-5,5),
           legend = "vertical")

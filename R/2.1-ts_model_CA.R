@@ -24,74 +24,7 @@ library(dglm)
 library(quantreg)
 setwd("~/Dropbox/UCSD/Thesis/3.Precipitation/Code")
 source("varx_fixed.R")
-
-## get aspect ratio from lon/lat
-map_aspect = function(x, y) {
-  x.center <- sum(range(x)) / 2
-  y.center <- sum(range(y)) / 2
-  x.dist <- ggplot2:::dist_central_angle(x.center + c(-0.5, 0.5), rep(y.center, 2))
-  y.dist <- ggplot2:::dist_central_angle(rep(x.center, 2), y.center + c(-0.5, 0.5))
-  y.dist / x.dist
-}
-
-durbinWatsonTest.r <- function(resid, max.lag=1){
-  n <-  length(resid)
-  dw <- rep(0, max.lag)
-  den <- sum(resid^2)
-  for (lag in 1:max.lag){
-    dw[lag] <- (sum((resid[(lag+1):n] - resid[1:(n-lag)])^2))/den
-  }
-  dw
-}
-
-durbinWatsonTest.glm <- function(model, max.lag=1, simulate=TRUE, reps=1000, 
-                                method="resample", 
-                                alternative="two.sided"){
-  resid <- residuals(model)
-  if (any(is.na(resid))) stop ('residuals include missing values')
-  n <- length(resid)
-  r <- dw <-rep(0, max.lag)
-  den <- sum(resid^2)
-  for (lag in 1:max.lag){
-    dw[lag] <- (sum((resid[(lag+1):n] - resid[1:(n-lag)])^2))/den
-    r[lag] <- (sum(resid[(lag+1):n]*resid[1:(n-lag)]))/den
-  }
-  if (!simulate){
-    result <- list(r=r, dw=dw)
-    result
-  }
-  else {
-    X <- model.matrix(model)
-    mu <- fitted.values(model)
-    Y <-  matrix(sample(resid, n*reps, replace=TRUE), n, reps) + matrix(mu, n, reps)
-    E <- apply(Y, 2, function(y) residuals(glm(y[y>0] ~ X[y>0,], family=Gamma(link = "log"))))
-    if(is.list(E))
-    {
-      DW = unlist(lapply(E, function(x) durbinWatsonTest.r(x,max.lag=max.lag)))
-    }else
-      DW <- apply(E, 2, durbinWatsonTest.r, max.lag=max.lag)
-    if (max.lag == 1) DW <- rbind(DW)
-    p <- rep(0, max.lag)
-    if (alternative == 'two.sided'){
-      for (lag in 1:max.lag) {
-        p[lag] <- (sum(dw[lag] < DW[lag,]))/reps
-        p[lag] <- 2*(min(p[lag], 1 - p[lag]))
-      }
-    }
-    else if (alternative == 'positive'){
-      for (lag in 1:max.lag) {
-        p[lag] <- (sum(dw[lag] > DW[lag,]))/reps
-      }
-    }
-    else {
-      for (lag in 1:max.lag) {
-        p[lag] <- (sum(dw[lag] < DW[lag,]))/reps
-      }
-    }
-    result <- list(r=r, dw=dw, p=p, alternative=alternative)
-    result
-  }
-}
+source("util.R")
 
 #####################################
 ############## Load data ############
@@ -118,7 +51,6 @@ tas_hist_ca = readRDS(file = paste0(tas_path,tas_hist_ca_all[1]))
 tas_rcp_ca = readRDS(file = paste0(tas_path,tas_rcp_ca_all[1]))
 pr_hist_ca = readRDS(file = paste0(pr_path,pr_hist_ca_all[1]))
 pr_rcp_ca = readRDS(file = paste0(pr_path,pr_rcp_ca_all[1]))
-
 
 ## find non-ocean area
 coords_ca$ind = 1
@@ -213,7 +145,7 @@ gls.pr.summary = gls.dat.summary[order(gls.dat.summary$loc,gls.dat.summary$year)
 #####################################
 
 season.var = c("winter","spring","summer","fall" )
-loc.names = c("SF","SD","Yosemite","Death Valley")
+loc.names = c("San Francisco","San Diego","Yosemite","Death Valley")
 select.loc = data.frame(sf = c(37.75,-122.25), sd = c(32.75,-117.25),
                         yo = c(37.75,-119.25), dv = c(36.25,-116.75))
 select.ind = c(126, 1, 132, 87)
@@ -225,20 +157,12 @@ sub.loc = list(x = c(-122.25, -117.25, -119.25, -116.75),
 n.season = length(season.var)
 n.loc = length(unique(gls.pr.summary$loc))
 time.yr = (range(gls.pr.summary$year)[1] : range(gls.pr.summary$year)[2])
-#time.rcp.yr = (range(gls.pr.rcp$year)[1] : range(gls.pr.rcp$year)[2])
-#time.pts = c(time.yr - mean(time.yr))/sd(time.yr)
 time.pts = c(time.yr - mean(time.yr))/10
-#time.rcp.pts = c(time.rcp.yr - mean(time.rcp.yr))/10
 n.time = length(time.pts)
-#n.rcp.time = length(time.rcp.pts)
 
-gls.tas.summary$time.pts = time.pts
-#gls.tas.rcp$time.pts = time.rcp.pts
-#gls.tas.all = rbind(gls.tas.summary,gls.tas.rcp)
-
+gls.tas.summary$time.pts = time.pts 
 gls.pr.summary$time.pts = time.pts
-#gls.pr.rcp$time.pts = time.rcp.pts
-#gls.pr.all = rbind(gls.pr.summary,gls.pr.rcp)
+
 
 #png("figures/tas_4season_map.png",width = 250, height = 100, res = 100,units = "in")
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
@@ -303,12 +227,6 @@ for(s in 1:length(select.ind))
     tas.dat = ts(gls.tas.summary[gls.tas.summary$loc==select.ind[s],season.var[i]],start = 1950)
     lines(tas.dat, ylim = range(gls.tas.summary[,season.var]),col=i)
   }
-  #if(s==1){
-  #  legend("topright",bty='n', xpd=NA,cex = 0.8,
-  #       legend=var.names,lty = 1, col=1:length(var.names))
-  #}
-  #{legend(par('usr')[2], par('usr')[4],bty='n', xpd=NA,cex = 0.8,
-  #       legend=var.names,lty = 1, col=1:length(var.names))}
 }
 legend(par('usr')[2], par('usr')[4]*2, bty='n', xpd=NA,cex = 1.1,
        legend=season.var,lty = 1, col=1:n.season)
@@ -325,12 +243,6 @@ for(s in 1:length(select.ind))
     tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[i]],start = 1950)
     lines(tas.dat,col=i)
   }
-  #if(s==1){
-  #  legend("topright",bty='n', xpd=NA,cex = 0.8,
-  #         legend=var.names,lty = 1, col=1:length(var.names))
-  #}
-  #{legend(par('usr')[2], par('usr')[4],bty='n', xpd=NA,cex = 0.8,
-  #       legend=var.names,lty = 1, col=1:length(var.names))}
 }
 legend(par('usr')[2], par('usr')[4]*2, bty='n', xpd=NA,cex = 1.1,
        legend=season.var,lty = 1, col=1:n.season)
@@ -381,8 +293,6 @@ for(i in 1:n.loc)
   for(j in 1:n.season)
   {
     tas_exp = gls.tas.summary[gls.tas.summary$loc==i,season.var[j]]
-    #tas_out = tas_exp[-1]
-    #tas_lag1 = tas_exp[-n.time]
     lm.fit = lm(tas_exp ~ time.pts)
     resid_mat[i,j,] = residuals(lm.fit)
     acf.res = acf(residuals(lm.fit),plot = FALSE)

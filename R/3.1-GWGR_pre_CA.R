@@ -3,17 +3,13 @@ library(forecast)
 library(reshape2)
 library(ggplot2)
 library(ggmap)
-#library(maps)
-#library(mapdata)
 library(mgcv)
 library(TSA)
 library(dplyr)
 library(fda)
-#library(sp)
 library(gstat)
 library(fields)
 library(MBA)
-#library(Vizumap)
 library(nlme)
 library(autoimage)
 library(FRK)
@@ -27,48 +23,48 @@ library(rgbif)
 library(mgcv)
 library(mgcViz)
 library(lctools)
-#library(GWmodel)
-library(bbmle)
-#library(spgwr)
+code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
+setwd(code_path)
+source(paste0(code_path,"gwr.R"))
+source(paste0(code_path,"varx_fixed.R"))
+source(paste0(code_path,"util.R"))
 
-## get aspect ratio from lon/lat
-map_aspect = function(x, y) {
-  x.center <- sum(range(x)) / 2
-  y.center <- sum(range(y)) / 2
-  x.dist <- ggplot2:::dist_central_angle(x.center + c(-0.5, 0.5), rep(y.center, 2))
-  y.dist <- ggplot2:::dist_central_angle(rep(x.center, 2), y.center + c(-0.5, 0.5))
-  y.dist / x.dist
-}
-
+#####################################
+############## Load data ############
+#####################################
 tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tas-rec-rcp85-mon-44i/"
 pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/pr-rec-rcp85-mon-44i/"
 map_path = "/Users/wenyilin/Documents/R/NA-CORDEX/map/"
-code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
-res_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/"
-#within_co = readRDS(file = paste0(map_path,"within_co.rds"))
-#within_ks = readRDS(file = paste0(map_path,"within_ks.rds"))
-load(paste0(map_path,"within_rec_ks.rdata"))
-load(paste0(map_path,"ks_rec_elevation.rdata"))
+within_ca = readRDS(file = paste0(map_path,"within_ca.rds"))
+load(paste0(map_path,"within_rec_ca.rdata"))
+load(paste0(map_path,"ca_elevation_rec.rdata"))
+load("/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/reports/ca_geodata.rdata")
+
 ### list files in CA
-#coords_ca_all = list.files(path = data_path,pattern = "^coords_ca")
-pr_hist_ks_all = list.files(path = pr_path,pattern = "^pr_ks_pr.hist")
-pr_rcp_ks_all = list.files(path = pr_path,pattern = "^pr_ks_pr.rcp85")
-### example analysis for KS
-pr_hist_ks = readRDS(file = paste0(pr_path,pr_hist_ks_all[1]))
-pr_rcp_ks = readRDS(file = paste0(pr_path,pr_rcp_ks_all[1]))
+pr_hist_ca_all = list.files(path = pr_path,pattern = "^pr_ca_pr.hist")
+pr_rcp_ca_all = list.files(path = pr_path,pattern = "^pr_ca_pr.rcp85")
+### example analysis for CA
+pr_hist_ca = readRDS(file = paste0(pr_path,pr_hist_ca_all[1]))
+pr_rcp_ca = readRDS(file = paste0(pr_path,pr_rcp_ca_all[1]))
 
 ## find non-ocean area
-ks_elevation$ele_std = (ks_elevation$elevation_geonames - min(ks_elevation$elevation_geonames))/(max(ks_elevation$elevation_geonames)-min(ks_elevation$elevation_geonames))
-ks_elevation$ele_norm = (ks_elevation$elevation_geonames - mean(ks_elevation$elevation_geonames))/1000
+coords_ca$ind = 1
+tmp.coords = merge(ca_elevation, coords_ca, by = c("latitude","longitude"),all.x=TRUE)
+land.ind = which(tmp.coords$ind==1 | tmp.coords$elevation_geonames.x>0)
+ca_elevation = ca_elevation[land.ind,]
+pr_hist_ca = pr_hist_ca[land.ind,]
+pr_rcp_ca = pr_rcp_ca[land.ind,]
+ca_elevation$ele_std = (ca_elevation$elevation_geonames - min(ca_elevation$elevation_geonames))/(max(ca_elevation$elevation_geonames)-min(ca_elevation$elevation_geonames))
+ca_elevation$ele_norm = (ca_elevation$elevation_geonames - mean(ca_elevation$elevation_geonames))/1000
 
 ## seasonal tas data
 time_dat = data.frame(year = rep(1950:2005,each=12),
                       month = rep(1:12,56),
                       ts.point = 1:(12*56))
-gls.dat = data.frame(lat = ks_elevation[,1], lon = ks_elevation[,2],
-                     elevation = ks_elevation[,5],
-                     tas = pr_hist_ks*86400*30,
-                     loc = as.factor(1:length(ks_elevation[,1])))
+gls.dat = data.frame(lat = ca_elevation[,1], lon = ca_elevation[,2],
+                     elevation = ca_elevation[,5],
+                     tas = pr_hist_ca*86400*30,
+                     loc = as.factor(1:length(ca_elevation[,1])))
 gls.dat.long = reshape2::melt(gls.dat,id.vars = c("lon","lat","elevation","loc"))
 names(gls.dat.long) = c("lon","lat","elevation","loc","ts.point","tas")
 gls.dat.long$ts.point = as.numeric(gsub("\\D", "", gls.dat.long$ts.point))
@@ -101,10 +97,10 @@ gls.pr.summary = gls.dat.summary[order(gls.dat.summary$loc,gls.dat.summary$year)
 time_rcp = data.frame(year = rep(2006:2100,each=12),
                       month = rep(1:12,95),
                       ts.point = 1:(12*95))  ## future projection
-gls.dat = data.frame(lat = ks_elevation[,1], lon = ks_elevation[,2],
-                     elevation = ks_elevation$ele_norm,
-                     tas = pr_rcp_ks*86400*30,
-                     loc = as.factor(1:length(ks_elevation[,1])))
+gls.dat = data.frame(lat = ca_elevation[,1], lon = ca_elevation[,2],
+                     elevation = ca_elevation$ele_norm,
+                     tas = pr_rcp_ca*86400*30,
+                     loc = as.factor(1:length(ca_elevation[,1])))
 gls.dat.long = reshape2::melt(gls.dat,id.vars = c("lon","lat","elevation","loc"))
 names(gls.dat.long) = c("lon","lat","elevation","loc","ts.point","tas")
 gls.dat.long$ts.point = as.numeric(gsub("\\D", "", gls.dat.long$ts.point))
@@ -135,13 +131,14 @@ gls.pr.rcp = gls.dat.summary[order(gls.dat.summary$loc,gls.dat.summary$year),]
 
 ## basic definitions
 season.var = c("winter","spring","summer","fall" )
-loc.names = c("Kansas City","Wichita","Oakley")
-select.loc = data.frame(kc = c(39.25,-94.75), wi = c(37.75,-97.25),
-                        oa = c(39.25,-100.75))
-select.ind = c(75,25,63)
-select.loc.col = c("red","green","blue")
-sub.loc = list(x = c(-94.97,-97.25,-100.75), 
-               y = c(39.25,37.75,39.25),
+loc.names = c("San Francisco","San Diego","Yosemite","Death Valley")
+select.loc = data.frame(sf = c(37.75,-122.25), sd = c(32.75,-117.25),
+                        yo = c(37.75,-119.25), dv = c(36.25,-116.75))
+select.ind = c(126, 1, 132, 87)
+select.loc.col = c("red","green","blue","darkgrey")
+season.var = c("winter","spring","summer","fall")
+sub.loc = list(x = c(-122.25, -117.25, -119.25, -116.75), 
+               y = c(37.75,32.75,37.75,36.25),
                labels = loc.names)
 n.season = length(season.var)
 n.loc = length(unique(gls.pr.summary$loc))
@@ -155,7 +152,9 @@ n.rcp.time = length(time.rcp.pts)
 
 gls.pr.summary$time.pts = time.pts
 gls.pr.rcp$time.pts = time.rcp.pts
-gls.pr.all = rbind(gls.pr.summary,gls.pr.summary)
+gls.pr.all = rbind(gls.pr.summary,gls.pr.rcp)
+gls.pr.summary[which(is.na(gls.pr.summary[,"winter"])),season.var]=0
+gls.pr.all[which(is.na(gls.pr.all[,"winter"])),season.var]=0
 
 ## color map
 cmap <- colorRampPalette(rev(brewer.pal(11, "RdBu")))
@@ -163,10 +162,10 @@ rev.cmap <- colorRampPalette(brewer.pal(11, "RdBu"))
 neg_cmap = colorRampPalette(rev(brewer.pal(11, "RdBu"))[1:6]) ## all blue
 pos_cmap = colorRampPalette(rev((brewer.pal(11, "RdBu"))[1:6])) ## all red
 
-# exploratory plots
+## exploratory plots
 ## spatial seasonal trend
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(ca_elevation$longitude,ca_elevation$latitude,
           gls.pr.summary[gls.pr.summary$year==1992,season.var],
           interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
@@ -177,37 +176,42 @@ autoimage(ks_elevation$longitude,ks_elevation$latitude,
           points = sub.loc,
           points.args = list(pch = 20, col = "white"),
           text = sub.loc,
-          text.args = list(pos = 3, col = "darkgreen",cex=1.1),
-          zlim = c(0,160),
+          text.args = list(pos = 3, col = "darkblue",cex=1.2,pch=2),
+          zlim = c(0,200),
           col=rev.cmap(200),
-          size = c(2, 2), lratio = 0.25,
+          size = c(1, 4), lratio = 0.35,
           legend = "vertical")
 
-# temporal seasonal trend
-### historical trends
+## temporal seasonal trend
 par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
 for(s in 1:length(select.ind))
 {
   tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[1]],start = 1950)
-  plot(tas.dat, ylim = range(gls.pr.summary[,season.var]), main = loc.names[s],
-       xlab = "Year", ylab = "Average precipitation")
+  plot(tas.dat, ylim = c(0,300), main = loc.names[s],
+       xlab = "Year", ylab = "Average seasonal precipitation (mm/month)  at four typical locations")
   for(i in 2: length(season.var))
   {
     tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[i]],start = 1950)
-    lines(tas.dat, ylim = range(gls.pr.summary[,season.var]),col=i)
+    lines(tas.dat,col=i)
   }
+  if(s==1){
+    legend("topright",bty='n', xpd=NA,cex = 0.8,
+           legend=season.var,lty = 1, col=1:length(season.var))
+  }
+  #{legend(par('usr')[2], par('usr')[4],bty='n', xpd=NA,cex = 0.8,
+  #       legend=var.names,lty = 1, col=1:length(var.names))}
 }
-legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
+legend(par('usr')[2], par('usr')[4]*2, bty='n', xpd=NA,cex = 1.1,
        legend=season.var,lty = 1, col=1:length(season.var))
-mtext("Average seasonal precipitation (mm/month) at three typical locations", outer = TRUE, cex = 1.15)
+mtext("Average seasonal precipitation (mm/month) at four typical locations", outer = TRUE, cex = 1.2)
 
 ### combined with future
 par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
 for(s in 1:length(select.ind))
 {
   tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[1]],start = 1950)
-  plot(tas.dat, xlim = c(1950,2100),ylim = range(gls.pr.all[,season.var]), main = loc.names[s],
-       xlab = "Year", ylab = "Average precipitation")
+  plot(tas.dat, xlim = c(1950,2100),ylim = c(0,250), main = loc.names[s],
+       xlab = "Year", ylab = "Average temperature")
   tas.dat = ts(gls.pr.rcp[gls.pr.rcp$loc==select.ind[s],season.var[1]],start = 2006)
   lines(tas.dat, lty=3)
   for(i in 2: length(season.var))
@@ -220,23 +224,7 @@ for(s in 1:length(select.ind))
 }
 legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
        legend=season.var,lty = 1, col=1:length(season.var))
-mtext("Average seasonal precipitation (mm/month) at three typical locations", outer = TRUE, cex = 1.2)
-
-## map of elevation
-par(oma = c(1, 1, 1, 1), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
-          ks_elevation$elevation_geonames,
-          interp.args = list(no.X = 200, no.Y = 200),
-          common.legend = FALSE,
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = c("elevation (m) in KS"),
-          points = sub.loc,
-          points.args = list(pch = 20, col = "white"),
-          text = sub.loc,
-          text.args = list(pos = 3, col = "white",cex=1.1),
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          legend = "vertical")
+mtext("Average seasonal temperature (C) at three typical locations", outer = TRUE, cex = 1.2)
 
 
 ## weighted regression on elevation
@@ -248,9 +236,6 @@ for(i in 1:n.loc)
   for(j in 1:n.season)
   {
     tas_exp = gls.pr.summary[gls.pr.summary$loc == i,season.var[j]]
-    #loc.j = gls.pr.summary$loc
-    #ele.j = gls.pr.summary$elevation
-    #time.j = gls.pr.summary$time.pts
     fit1 = glm(tas_exp ~ time.pts, family=Gamma(link = "log"))
     resids[i,,j] = fit1$residuals
     deviance = fit1$deviance
@@ -264,7 +249,7 @@ for(i in 1:n.loc)
 }
 
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(ca_elevation$longitude,ca_elevation$latitude,
           slope_est,
           #interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
@@ -274,14 +259,14 @@ autoimage(ks_elevation$longitude,ks_elevation$latitude,
           #text = as,
           #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
-          col=rev.cmap(100),
-          zlim = c(-0.1,0.1),
-          size = c(2,2), lratio = 0.25,
+          size = c(1,4), lratio = 0.35,
+          col=cmap(100),
+          zlim = c(-0.2,0.2),
           legend = "vertical")
 
 z_score = slope_est/slope_se
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(ca_elevation$longitude,ca_elevation$latitude,
           z_score,
           # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
@@ -291,15 +276,20 @@ autoimage(ks_elevation$longitude,ks_elevation$latitude,
           #text = as,
           #text.args = list(cex=2),
           legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=rev.cmap(100),
-          zlim = c(-2.5,2.5),
+          size = c(1,4), lratio = 0.35,
+          col=cmap(100),
+          zlim = c(-5,5),
           legend = "vertical")
+
+## glmm
+glmer.fit1 = glmer(winter ~ time.pts + (1 | loc), data = gls.pr.summary, family = Gamma(link = "log"))
+tt = gls.pr.summary
+tt$X = as.numeric(as.factor(tt$lon))
+tt$Y = as.numeric(as.factor(tt$lat))
+gwpr = gw.glm(summer ~ elevation,  Gamma(link = "log"), tt ,40, kernel = "fixed", cbind(tt$X,tt$Y))
 
 ## spatial fitting
 gwr_gamma = function(b0,b1,b2, logshape) {
-  #n = dim(y)[1]
-  #ts = dim(y)[2]
   loglik = rep(0, n.loc)
   for(j in 1:n.loc)
   {
@@ -342,10 +332,10 @@ gwr_loglik = function(b0,b1,b2, logshape)
   sum(loglik)
 }
 
-source(paste0(code_path,"gwr.R"))
 n.lon = length(unique(gls.pr.summary$lon))
 n.lat = length(unique(gls.pr.summary$lat))
-simgrid = expand.grid(1:n.lon, 1:n.lat)
+simgrid = cbind(as.numeric(as.factor(ca_elevation$longitude)),
+                as.numeric(as.factor(ca_elevation$latitude)))
 distance = as.matrix(dist(simgrid))
 r.distance = as.matrix(dist(simgrid)) * 50 ##0.44 degree = 50km
 
@@ -357,9 +347,7 @@ cor.glm.test = cor.gwr.test = list()
 for(t in 1:n.season)
 {
   cor.glm[[t]] = cor(t(resids[,,t]))
-  c#or.gwr[[t]] = cor(fit_m3_2$residuals[,t,])
   cor.glm.test[[t]] = pnorm(atanh(cor.glm[[t]]),lower.tail = FALSE)
-  #cor.gwr.test[[t]] = pnorm(atanh(cor.gwr[[t]]),lower.tail = FALSE)
 }
 
 op = par(mfrow = c(2,2),
@@ -374,11 +362,6 @@ for(t in 1:n.season)
        pch=".", cex=0.8, main = season.var[t],ylim=c(0,1), col="grey")
   tmp.fit = lm(I(tmp.cor-1) ~ 0 + vec.dist, data = tmp.dat)
   abline(1, coef(tmp.fit), lty=2)
-  #tmp.quad = lm(tmp.cor ~ vec.dist + I(vec.dist^2), data = tmp.dat)
-  #dist = seq(0, max(vec.dist), by=0.1)
-  #pred.cor = predict(tmp.quad,newdata = data.frame(vec.dist = dist))
-  #lines(dist, pred.cor, col="blue")
-  #legend("topright", legend = c("linear","quadratic"),col = c("red","blue"), lty=1)
 }
 title(xlab = "distance in grids",
       ylab = "residual correlation",
@@ -428,10 +411,11 @@ cor.rsquare
 
 ## gwglm
 d_bis = seq(1,10,by = 0.5)
-w0 = diag(1, n.loc)
-w1 = gwr.lm(distance,d_bis[6])
-w3 = gwr.exp(distance, 6)
+w0 = diag(1, n.loc) # weight matrix with no spatial correlation
+w1 = gwr.lm(distance,d_bis[3]) # weight matrix from linear kernel
+w3 = gwr.exp(distance, 6) # weight matrix from exponential kernel
 
+## Fitted with current data
 x = list()
 y.all = list()
 for(i in 1:n.loc)
@@ -471,7 +455,6 @@ gwgr.b0.se = gwgr.slope.se = gwgr.h.se = matrix(0, nrow = n.loc, ncol=n.season)
 gwgr.loglik = matrix(0, nrow = n.loc, ncol=n.season)
 dat_pred = dat_resid = pr_exp
 rcp_pred = pr_rcp
-
 for(i in 1:n.loc)
 {
   w_i = w1[i,]
@@ -479,8 +462,8 @@ for(i in 1:n.loc)
   {
     y = y.all[[j]]
     m_mle2 = bbmle::mle2(gwr_gamma,optimfun = "BFGS",
-                          start = list(b0 = 2,b1 = slope_est[i,j], b2=0.01,
-                                       logshape = log(shape_est[i,j])))
+                         start = list(b0 = 2,b1 = slope_est[i,j], b2=0.01,
+                                      logshape = log(shape_est[i,j])))
     gwgr.b0[i,j] = bbmle::coef(m_mle2)[1]
     gwgr.slope[i,j] = bbmle::coef(m_mle2)[2]
     gwgr.h[i,j] = bbmle::coef(m_mle2)[3]
@@ -520,7 +503,7 @@ for(i in 1:n.loc)
     #gr.h[i,j] = coef(m_mle2)[3]
     gr.b0.se[i,j] = sqrt(diag(bbmle::vcov(m_mle2)))[1]
     gr.slope.se[i,j] = sqrt(diag(bbmle::vcov(m_mle2)))[2]
-    #gr.h.se[i,j] = sqrt(diag(vcov(m_mle2)))[3]
+    #gr.h.se[i,j] = sqrt(diag(bbmle::vcov(m_mle2)))[3]
     gr.loglik[i,j] = gwr_loglik(bbmle::coef(m_mle2)[1],bbmle::coef(m_mle2)[2],
                                 0,bbmle::coef(m_mle2)[3])
     beta.t = bbmle::coef(m_mle2)[1:3]
@@ -553,7 +536,7 @@ for(j in 1:n.season)
 gwgr.b0 = gwgr.slope = gwgr.h = matrix(0, nrow = n.loc, ncol=n.season)
 gwgr.b0.se = gwgr.slope.se = gwgr.h.se = matrix(0, nrow = n.loc, ncol=n.season)
 gwgr.loglik = matrix(0, nrow = n.loc, ncol=n.season)
-#dat_pred = dat_resid = pr_exp
+dat_pred = pr_exp
 rcp_pred = rcp_resid = pr_rcp
 for(i in 1:n.loc)
 {
@@ -570,7 +553,8 @@ for(i in 1:n.loc)
     gwgr.b0.se[i,j] = sqrt(diag(bbmle::vcov(m_mle2)))[1]
     gwgr.slope.se[i,j] = sqrt(diag(bbmle::vcov(m_mle2)))[2]
     gwgr.h.se[i,j] = sqrt(diag(bbmle::vcov(m_mle2)))[3]
-    gwgr.loglik[i,j] = gwr_loglik(bbmle::coef(m_mle2)[1],bbmle::coef(m_mle2)[2],bbmle::coef(m_mle2)[3],bbmle::coef(m_mle2)[4])
+    gwgr.loglik[i,j] = gwr_loglik(bbmle::coef(m_mle2)[1],bbmle::coef(m_mle2)[2],
+                                  bbmle::coef(m_mle2)[3],bbmle::coef(m_mle2)[4])
     beta.t = bbmle::coef(m_mle2)[1:3]
     rcp_pred[,j,i] = exp(x_rcp[,,i]%*%beta.t)[,1]
     rcp_resid[,j,i] = y[i,]-rcp_pred[,j,i]
@@ -578,16 +562,16 @@ for(i in 1:n.loc)
 }
 
 future.gwgr = list(gwgr.b0 = gwgr.b0, gwgr.slope = gwgr.slope, gwgr.h=gwgr.h,
-                gwgr.b0.se=gwgr.b0.se,gwgr.slope.se=gwgr.slope.se,gwgr.h.se=gwgr.h.se,
-                gwgr.loglik = gwgr.loglik,
-                dat_pred = rcp_pred,dat_resid = rcp_resid)
+                   gwgr.b0.se=gwgr.b0.se,gwgr.slope.se=gwgr.slope.se,gwgr.h.se=gwgr.h.se,
+                   gwgr.loglik = gwgr.loglik,
+                   dat_pred = rcp_pred,dat_resid = rcp_resid)
 
-gwgr.pre.ks = list(res.gr = res.gr,
+gwgr.pre.ca = list(res.gr = res.gr,
                    res.gwgr = res.gwgr,
                    future.gwgr = future.gwgr
-                   #gwgr.AICc.lm = gwgr.AICc.lm
-)
-#save(gwgr.pre.ks,file = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/summary_results_20211101/ks_pre_coef.rdata")
+                   #gwgr.AICc.lm = gwgr.AICc
+                   )
+#save(gwgr.pre.ca,file = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/summary_results_20211101/ca_pre_coef.rdata")
 
 
 ## current prediction
@@ -595,7 +579,7 @@ par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
 for(s in 1:length(select.ind))
 {
   tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[1]],start = 1950)
-  plot(tas.dat, ylim = range(gls.pr.all[,season.var]), main = loc.names[s],
+  plot(tas.dat, ylim = c(0,300), main = loc.names[s],
        xlab = "Year", ylab = "Average precipitation")
   tas.dat = ts(dat_pred[,1,select.ind[s]],start = 1950)
   lines(tas.dat, lty = 2)
@@ -632,13 +616,15 @@ legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
        legend=c(season.var),lty = 1, col=1:length(season.var))
 mtext("RCM seasonal precipitation vs. predicted precipitation (2006-2100)", outer = TRUE, cex = 1)
 
+
 ## Compute AICc
 n.df = 4
 gwgr.AICc = apply(gwgr.loglik, 2, function(x) -2*sum(x) + 2*n.df*n.loc + 2*(n.df*n.loc)*(n.df*n.loc+1)/(n.time*n.loc)-n.df*n.loc-1)
+n.df = 3
 gr.AICc = apply(gr.loglik, 2, function(x) -2*sum(x) + 2*n.df*n.loc + 2*(n.df*n.loc)*(n.df*n.loc+1)/(n.time*n.loc)-n.df*n.loc-1)
 
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(ca_elevation$longitude,ca_elevation$latitude,
           gwgr.slope,
           #interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
@@ -649,7 +635,7 @@ autoimage(ks_elevation$longitude,ks_elevation$latitude,
           #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
           col=cmap(200),
-          zlim = c(-0.1,0.1),
+          zlim = c(-0.2,0.2),
           size = c(2,2), lratio = 0.25,
           legend = "vertical")
 
@@ -688,7 +674,7 @@ autoimage(ks_elevation$longitude,ks_elevation$latitude,
 
 gwgr_z_score = gwgr.slope/gwgr.slope.se
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ks_elevation$longitude,ks_elevation$latitude,
+autoimage(ca_elevation$longitude,ca_elevation$latitude,
           gwgr_z_score,
           # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
@@ -762,12 +748,4 @@ for(j in 1:length(d_bis))
   }
   gwgr.AICc.lm[j,] = apply(gwgr.loglik.t, 2, function(x) -2*sum(x) + 2*n.df*n.loc + 2*(n.df*n.loc)*(n.df*n.loc+1)/(n.time*n.loc)-n.df*n.loc-1)
 }#
-
-## glmm
-glmer.fit1 = glmer(winter ~ time.pts + (1 | loc), data = gls.pr.summary, family = Gamma(link = "log"))
-tt = gls.pr.summary
-tt$X = as.numeric(as.factor(tt$lon))
-tt$Y = as.numeric(as.factor(tt$lat))
-gwpr = gw.glm(summer ~ elevation,  Gamma(link = "log"), tt ,40, kernel = "fixed", cbind(tt$X,tt$Y))
-
 

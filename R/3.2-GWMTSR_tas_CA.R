@@ -3,17 +3,13 @@ library(forecast)
 library(reshape2)
 library(ggplot2)
 library(ggmap)
-#library(maps)
-#library(mapdata)
 library(mgcv)
 library(TSA)
 library(dplyr)
 library(fda)
-#library(sp)
 library(gstat)
 library(fields)
 library(MBA)
-#library(Vizumap)
 library(nlme)
 library(autoimage)
 library(FRK)
@@ -29,21 +25,18 @@ library(mgcViz)
 library(lctools)
 #library(spgwr)
 
-## get aspect ratio from lon/lat
-map_aspect = function(x, y) {
-  x.center <- sum(range(x)) / 2
-  y.center <- sum(range(y)) / 2
-  x.dist <- ggplot2:::dist_central_angle(x.center + c(-0.5, 0.5), rep(y.center, 2))
-  y.dist <- ggplot2:::dist_central_angle(rep(x.center, 2), y.center + c(-0.5, 0.5))
-  y.dist / x.dist
-}
+code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
+setwd(code_path)
+source(paste0(code_path,"gwr.R"))
+source(paste0(code_path,"varx_fixed.R"))
+source(paste0(code_path,"util.R"))
 
+#####################################
+############## Load data ############
+#####################################
 tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tas-rec-rcp85-mon-44i/"
 pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/pr-rec-rcp85-mon-44i/"
-# tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tmean-gridmet/"
-# pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/prec-gridmet/"
 map_path = "/Users/wenyilin/Documents/R/NA-CORDEX/map/"
-code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
 res_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/"
 within_ca = readRDS(file = paste0(map_path,"within_ca.rds"))
 load(paste0(map_path,"within_rec_ca.rdata"))
@@ -104,7 +97,6 @@ gls.dat.summary$fall = as.data.frame(gls.dat.long %>%
                                        dplyr::summarise(fall = mean(tas))
 )$fall
 gls.tas.summary = gls.dat.summary[order(gls.dat.summary$loc,gls.dat.summary$year),]
-#gls.tas.summary = gls.tas.summary[complete.cases(gls.tas.summary),]
 
 ## future data
 time_rcp = data.frame(year = rep(2006:2100,each=12),
@@ -150,7 +142,7 @@ pos_cmap = colorRampPalette(rev((brewer.pal(11, "RdBu"))[1:6])) ## all red
 
 ## exploratory plots
 season.var = c("winter","spring","summer","fall" )
-loc.names = c("SF","SD","Yosemite","Death Valley")
+loc.names = c("San Francisco","San Diego","Yosemite","Death Valley")
 select.loc = data.frame(sf = c(37.75,-122.25), sd = c(32.75,-117.25),
                         yo = c(37.75,-119.25), dv = c(36.25,-116.75))
 select.ind = c(100, 1, 106, 78)
@@ -164,7 +156,6 @@ n.season = length(season.var)
 n.loc = length(unique(gls.tas.summary$loc))
 time.yr = (range(gls.tas.summary$year)[1] : range(gls.tas.summary$year)[2])
 time.rcp.yr = (range(gls.tas.rcp$year)[1] : range(gls.tas.rcp$year)[2])
-#time.pts = c(time.yr - mean(time.yr))/sd(time.yr)
 time.pts = c(time.yr - mean(time.yr))/10
 time.rcp.pts = c(time.rcp.yr - mean(time.rcp.yr))/10
 n.time = length(time.pts)
@@ -173,15 +164,10 @@ n.rcp.time = length(time.rcp.pts)
 gls.tas.summary$time.pts = time.pts
 gls.tas.rcp$time.pts = time.rcp.pts
 gls.tas.all = rbind(gls.tas.summary,gls.tas.rcp)
-#gls.tas.summary[which(is.na(gls.tas.summary[,"winter"])),season.var]=0
-#gls.tas.all[which(is.na(gls.tas.all[,"winter"])),season.var]=0
 
 gls.pr.summary$time.pts = time.pts
 gls.pr.rcp$time.pts = time.rcp.pts
 gls.pr.all = rbind(gls.pr.summary,gls.pr.rcp)
-# gls.pr.summary[which(is.na(gls.pr.summary[,"winter"])),season.var]=0
-# gls.pr.all[which(is.na(gls.pr.all[,"winter"])),season.var]=0
-
 
 ## spatial seasonal trend
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
@@ -254,15 +240,9 @@ autoimage(ca_elevation$longitude,ca_elevation$latitude,
           text.args = list(pos = 3, col = "white",cex=1.1),
           mtext.args = list(cex = 1),
           legend.axis.args = list(cex.axis=1),
-          #size = c(2,3), lratio = 0.4,
-          #col.args = list(cmap1(100),cmap2(100))``
-          #col=cmap1(100),
-          #zlim = list(c(10,35),c(0,3500)),
           legend = "vertical")
 
-## weighted regression on elevation
-source(paste0(code_path,"varx_fixed.R"))
-
+## non-weighted regression on elevation
 beta_est = beta_se = matrix(0, nrow = n.loc, ncol = n.season)
 b0_est = matrix(0, nrow = n.loc, ncol = n.season)
 season_coef = season_se = matrix(0, nrow = n.loc, ncol = n.season)
@@ -279,11 +259,6 @@ for(i in 1:n.loc)
                       c(0,1,0,0),
                       c(0,0,1,0),
                       c(0,0,0,1))
-  # fixed_beta2 = rbind(matrix(1,nrow = 2,ncol = 4),
-  #                     c(0,0,0,0),
-  #                     c(0,0,0,0),
-  #                     c(0,0,0,0),
-  #                     c(0,0,0,0))
   m_ar0_cor2 = varx_fixed(tas_exp[-1,],p=0,xt = x_multi,fixed = fixed_beta2)
   beta_est[i,] = m_ar0_cor2$beta[,1]
   b0_est[i,] = m_ar0_cor2$coef[1,]
@@ -296,26 +271,24 @@ for(i in 1:n.loc)
                     m_ar0_cor2$se.beta[4,5])
   resids[i,,] = m_ar0_cor2$residuals
   aics[i] = m_ar0_cor2$aic
-  #resids_c = center_apply(m_ar0_cor2$residuals)
   sresids[i,,] = t((chol(solve(m_ar0_cor2$Sigma)))%*% t(m_ar0_cor2$residuals))
 }
 
+## linear trend map
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
 autoimage(ca_elevation$longitude,ca_elevation$latitude,
           beta_est,
-          # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
           main = season.var,
           outer.title = "Estimated slopes (C/decade) of four seasons",
           mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
           size = c(1, 4), lratio = 0.35,
           col=cmap(200),
           zlim = c(-0.5,0.5),
           legend = "vertical")
 
+## linear trend zscore map
 z_score = beta_est/beta_se
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
 autoimage(ca_elevation$longitude,ca_elevation$latitude,
@@ -331,37 +304,21 @@ autoimage(ca_elevation$longitude,ca_elevation$latitude,
           zlim = c(-6,6),
           legend = "vertical")
 
+## cross-season effects map
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
 autoimage(ca_elevation$longitude,ca_elevation$latitude,
           season_coef,
-          # interp.args = list(no.X = 200, no.Y = 200),
           map = "county",ylab = "Latitude",xlab = "Longitude",
           main = season.var,
           outer.title = "Estimated slopes (C/decade) of four seasons",
           mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
           legend.axis.args = list(cex.axis=1),
           size = c(1, 4), lratio = 0.35,
           col=cmap(200),
           zlim = c(-0.3,0.7),
           legend = "vertical")
 
-z_score = season_coef/season_se
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z_scores of estimated slopes of four seasons",
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(1, 4), lratio = 0.35,
-          col=cmap(200),
-          zlim = c(-5,5),
-          legend = "vertical")
-
+## non-weight parameter list
 ca_tas_nw = list(b0_est = b0_est,
                  beta_est = beta_est,
                  beta_se = beta_se,
@@ -369,7 +326,7 @@ ca_tas_nw = list(b0_est = b0_est,
                  season_se = season_se,
                  resids = resids)
 
-## Fit with future data
+## Fit with future data with non-weighted model
 beta_rcp_est = beta_rcp_se = matrix(0, nrow = n.loc, ncol = n.season)
 b0_rcp_est = matrix(0, nrow = n.loc, ncol = n.season)
 season_rcp_coef = season_rcp_se = matrix(0, nrow = n.loc, ncol = n.season)
@@ -408,14 +365,11 @@ ca_tas_rcp_nw = list(b0_est = b0_est,
                  season_se = season_se,
                  resids = resids)
 
+#####################################
+######## Test Weighted Model ########
+#####################################
+
 ## test spatial correlation
-rmvn <- function(n, mu = 0, V = matrix(1)) {
-  p <- length(mu)
-  if (any(is.na(match(dim(V), p)))) 
-    stop("Dimension problem!")
-  D <- chol(V)
-  t(matrix(rnorm(n * p), ncol = p) %*% D + rep(mu, rep(n, p)))
-}
 n.lon = length(unique(gls.tas.summary$lon))
 n.lat = length(unique(gls.tas.summary$lat))
 simgrid = cbind(as.numeric(as.factor(ca_elevation$longitude)),
@@ -481,7 +435,6 @@ par(op)
 apply(cor.p.x1,1,function(x) table(x<0.05)) ## linear term significant?
 apply(cor.p.x2,1,function(x) table(x<0.05)) ## quadratic term significant?
 
-
 ## test kernel functions
 m.type = c("log_lm","log_quad","lm","quad")
 cor.rsquare = matrix(0, nrow = length(m.type), ncol=n.season)
@@ -525,7 +478,6 @@ colnames(cor.rsquare) = season.var
 cor.rsquare
 
 ## special case: wii = 1 and wij=0 if i\neq j
-source(paste0(code_path,"gwr.R"))
 m1 = lm(summer ~ time.pts, data = gls.tas.summary)
 m2.1 = lm(winter ~ time.pts + elevation, data = gls.tas.summary)
 m2.2 = lm(spring ~ time.pts + elevation + winter, data = gls.tas.summary)
@@ -652,7 +604,10 @@ for(i in 1:n.loc)
   }
 }
 
-source(paste0(code_path,"gwr.R"))
+#####################################
+######## Constructing GWMTSR ########
+#####################################
+
 ## bisquare kernel
 d_bis = seq(1,10,by = 0.5)
 
@@ -663,13 +618,10 @@ aic.bisquare.w1 = aic.bisquare.w2 = matrix(0, nrow = 4, ncol = length(d_bis))
 for(j in 1:length(d_bis))
 {
   print(j)
-  #w1 = gwr.bisquare(distance^2,d_bis[j])
   w2 = gwr.lm(distance,d_bis[j])
-  #fit_t1 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w1,fixed = fixed_beta2)
   fit_t2 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w2,fixed = fixed_beta2)
-  #aic.bisquare.w1[,j] = fit_t1$aic
   aic.bisquare.w2[,j] = fit_t2$aic
-}## d=1.6
+}
 
 d_gauss = seq(1,10,by = 0.5)
 aic.gauss.w3 = aic.gauss.w4 = matrix(0, nrow = 4, ncol = length(d_gauss))
@@ -741,7 +693,6 @@ for(i in 1:n.fold)
 }
 
 ## Bisquare kernel d_bis[2]=1.1
-source(paste0(code_path,"gwr.R"))
 fixed_beta2 = rbind(matrix(1,nrow = 3,ncol = 4),diag(1,4))
 fixed_beta3 = rbind(matrix(1,nrow = 3,ncol = 4),diag(0,4))
 fixed_beta4 = rbind(matrix(1,nrow = 2,ncol = 4),rep(0,4),diag(1,4))
@@ -766,14 +717,10 @@ fixed_beta4 = rbind(matrix(1,nrow = 2,ncol = 4),rep(0,4),diag(1,4))
 aic.bisquare.w1 = aic.bisquare.w2 = matrix(0, nrow = 4, ncol = length(d_bis))
 for(j in 1:length(d_bis))
 {
-  #print(j)
-  #w1 = gwr.bisquare(distance^2,d_bis[j])
   w2 = gwr.lm(distance,d_bis[j])
-  #fit_t1 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w1,fixed = fixed_beta2)
   fit_t2 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta2)
   fit_t3 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta3)
   fit_t4 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta4)
-  #aic.bisquare.w1[,j] = fit_t1$aic
   aic.bisquare.w2[,j] = fit_t2$aic
   print(fit_t2$aic)
 }## d=1.6
@@ -790,12 +737,6 @@ for(j in 1:length(d_gauss))
   aic.gauss.w3[,j] = fit_t3$aic
   aic.gauss.w4[,j] = fit_t4$aic
 }## d[6]=0.6
-
-# ca_tas_coef = list(ca_tas_nw = ca_tas_nw,
-#                    ca_tas_w = fit_m3_2,
-#                    ca_tas_pre = pred_m3_2)
-# save(ca_tas_coef,file = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/summary_results_20211101/ca_tas_coef.rdata")
-
 
 ## Prediction with future data
 rcp_pred = pred.dat(x_rcp, pred_m3_2$coef)
@@ -843,563 +784,4 @@ for(s in 1:length(select.ind))
 legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
        legend=c(season.var),lty = 1, col=1:length(season.var))
 mtext("RCM seasonal temperature vs. predicted temperature (2006-2100)", outer = TRUE, cex = 1.2)
-
-
-## Test with other weight matrices
-fit_m3_1 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w1,fixed = fixed_beta2)
-fit_m3_2 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w2,fixed = fixed_beta2)
-fit_m3_23 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w2,fixed = fixed_beta3)
-fit_m3_24 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w2,fixed = fixed_beta4)
-fit_m3_3 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w3,fixed = fixed_beta2)
-fit_m3_3s = varw_fixed(tas_exp,p=0,xt = x_mult,w = w3,fixed = fixed_beta3)
-fit_m3_4 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w4,fixed = fixed_beta2)
-fit_m3_4s = varw_fixed(tas_exp,p=0,xt = x_mult,w = w4,fixed = fixed_beta3)
-
-
-w_aic = rbind(fit_m3_1$aic,fit_m3_2$aic,fit_m3_3$aic,fit_m3_4$aic)
-w_b0_est = list(t(fit_m3_1$coef[1,,]),t(fit_m3_2$coef[1,,]),
-                t(fit_m3_3$coef[1,,]),t(fit_m3_4$coef[1,,]))
-w_slope_est = list(t(fit_m3_1$coef[2,,]),t(fit_m3_2$coef[2,,]),
-                    t(fit_m3_3$coef[2,,]),t(fit_m3_4$coef[2,,]))
-w_h_est = list(t(fit_m3_1$coef[3,,]),t(fit_m3_2$coef[3,,]),
-               t(fit_m3_3$coef[3,,]),t(fit_m3_4$coef[3,,]))
-w_sea_est = list(cbind(fit_m3_1$coef[4,1,],fit_m3_1$coef[5,2,],
-                   fit_m3_1$coef[6,3,],fit_m3_1$coef[7,4,]),
-                  cbind(fit_m3_2$coef[4,1,],fit_m3_2$coef[5,2,],
-                        fit_m3_2$coef[6,3,],fit_m3_2$coef[7,4,]),
-                  cbind(fit_m3_3$coef[4,1,],fit_m3_3$coef[5,2,],
-                        fit_m3_3$coef[6,3,],fit_m3_3$coef[7,4,]),
-                  cbind(fit_m3_4$coef[4,1,],fit_m3_4$coef[5,2,],
-                        fit_m3_4$coef[6,3,],fit_m3_4$coef[7,4,]))
-
-w_b0_se = list(t(fit_m3_1$se.coef[1,,]),t(fit_m3_2$se.coef[1,,]),
-                t(fit_m3_3$se.coef[1,,]),t(fit_m3_4$se.coef[1,,]))
-w_slope_se = list(t(fit_m3_1$se.coef[2,,]),t(fit_m3_2$se.coef[2,,]),
-                   t(fit_m3_3$se.coef[2,,]),t(fit_m3_4$se.coef[2,,]))
-w_h_se = list(t(fit_m3_1$se.coef[3,,]),t(fit_m3_2$se.coef[3,,]),
-              t(fit_m3_3$se.coef[3,,]),t(fit_m3_4$se.coef[3,,]))
-w_sea_se = list(cbind(fit_m3_1$se.coef[4,1,],fit_m3_1$se.coef[5,2,],
-                  fit_m3_1$se.coef[6,3,],fit_m3_1$se.coef[7,4,]),
-                 cbind(fit_m3_2$se.coef[4,1,],fit_m3_2$se.coef[5,2,],
-                       fit_m3_2$se.coef[6,3,],fit_m3_2$se.coef[7,4,]),
-                 cbind(fit_m3_3$se.coef[4,1,],fit_m3_3$se.coef[5,2,],
-                       fit_m3_3$se.coef[6,3,],fit_m3_3$se.coef[7,4,]),
-                 cbind(fit_m3_4$se.coef[4,1,],fit_m3_4$se.coef[5,2,],
-                       fit_m3_4$se.coef[6,3,],fit_m3_4$se.coef[7,4,]))
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_b0_est[[3]],
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated intercept (C) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(1, 4), lratio = 0.35,
-          col=cmap(200),
-          #zlim = c(-10,32),
-          zlim = c(-ceiling(max(abs(w_b0_est[[2]]))),ceiling(max(abs(w_b0_est[[2]])))),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_slope_est[[2]],
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slope (C/decade) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(1, 4), lratio = 0.35,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-0.5,0.5),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_h_est[[2]],
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated elevation slope (C/km) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(1, 4), lratio = 0.35,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-4,4),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_sea_est[[2]],
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated seasonal correaltion (C/C) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(1, 4), lratio = 0.35,
-          col=pos_cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(0,1.2),
-          legend = "vertical")
-
-## z-scores
-z_score = list(slope_m1 = w_slope_est[[1]]/w_slope_se[[1]],
-               slope_m2 = w_slope_est[[2]]/w_slope_se[[2]],
-               slope_m3 = w_slope_est[[3]]/w_slope_se[[3]],
-               slope_m4 = w_slope_est[[4]]/w_slope_se[[4]])
-z_score_nw = beta_est/beta_se
-
-ca_res = list(cor.rsquare = cor.rsquare,
-              aic.list = aic.list,
-              beta_nw = beta_est,
-              z_score_nw = z_score_nw, w_b0_est = w_b0_est, 
-              w_slope_est=w_slope_est,w_h_est=w_h_est,
-              w_sea_est = w_sea_est,z_score_w = z_score)
-save(ca_res,file = paste0(res_path,"ca_res.rdata"))
-
-par(mfrow=c(2,2),mar=c(2,2,3,1))
-col1 = rgb(1,0,0,1/4)
-col2 = rgb(0,1,0,1/4)
-col3 = rgb(0,0,1,1/4)
-for(i in 1:n.season)
-{
-  tmp.z = cbind(z_score$slope_m2[,i],z_score$slope_m3[,i],z_score_nw[,i])
-  hist(tmp.z[,1],xlab = "Z-score",main = paste0(season.var[i]," slope z scores"), breaks = 30, col=col1,xlim = range(tmp.z))
-  #hist(z_score$slope_m1[,2],col=rgb(0,1,1,1/4), add = T, breaks =30)
-  #hist(tmp.z[,2],col=col2, add = T, breaks =30)
-  #hist(z_score$slope_m4[,2],col=rgb(1,1,0,1/4), add = T, breaks =30)
-  hist(tmp.z[,3],col=col3, add = T, breaks =30)
-  if(i==n.season)
-    legend("topleft",legend = c("weighted","non-weighted"),
-           fill = c(col1,col3),
-           bty = 'n',cex = 0.75,
-           border = NA)
-}
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score$slope_m2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z scores of time slope of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(1, 4), lratio = 0.35,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-21,21),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score$h_z,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z scores of elevation slope of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-10,10),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score$sea_z,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z scores of seasonal correlation of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(0,18),
-          legend = "vertical")
-
-## Correlation between residuals
-cor.se = 1/sqrt(dim(resids)[2]-3)
-cor.ols = cor.gwr = list()
-cor.ols.test = cor.gwr.test = list()
-for(t in 1:n.season)
-{
-  cor.ols[[t]] = cor(fit_m1$residuals[,t,])
-  cor.gwr[[t]] = cor(fit_m3_2$residuals[,t,])
-  cor.ols.test[[t]] = pnorm(atanh(cor.ols[[t]]),lower.tail = FALSE)
-  cor.gwr.test[[t]] = pnorm(atanh(cor.gwr[[t]]),lower.tail = FALSE)
-}
-
-op = par(mfrow = c(2,2),
-         oma = c(5,4,0,0) + 0.1,
-         mar = c(0,0,1,1) + 0.1)
-
-for(t in 1:n.season)
-{
-  tmp.cor = as.vector(cor.gwr[[t]])
-  vec.dist = as.vector(distance)
-  tmp.dat = data.frame(tmp.cor = tmp.cor, vec.dist = vec.dist)
-  plot(vec.dist, tmp.cor,xlab="distance in pixel",ylab="correlation", 
-       pch=".", cex=0.8, main = season.var[t],ylim=c(0,1), col="grey")
-  tmp.fit = lm(I(tmp.cor-1) ~ 0 + vec.dist, data = tmp.dat)
-  abline(1, coef(tmp.fit), lty=2)
-  
-  for(i in 1:length(select.ind))
-  {
-    tmp.fit1 = lm(I(cor.gwr[[t]][select.ind[i],]-1) ~ 0 + distance[select.ind[i],])
-    abline(1, coef(tmp.fit1), col=select.loc.col[i])
-  }
-  if(t == n.season)
-    legend("bottomleft", legend = c("overall",loc.names),
-           col = c("black", select.loc.col), lty=1,cex=0.8)
-  #tmp.quad = lm(tmp.cor ~ vec.dist + I(vec.dist^2), data = tmp.dat)
-  #dist = seq(0, max(vec.dist), by=0.1)
-  #pred.cor = predict(tmp.quad,newdata = data.frame(vec.dist = dist))
-  #lines(dist, pred.cor, col="blue")
-  #legend("topright", legend = c("linear","quadratic"),col = c("red","blue"), lty=1)
-}
-title(xlab = "distance in grids",
-      ylab = "residual correlation",
-      outer = TRUE, line = 3)
-par(op)
-
-col1 = rgb(1,0,0,1/4)
-col2 = rgb(0,1,0,1/4)
-par(mfrow = c(2,2))
-for(t in 1:n.season)
-{
-  hist(cor.ols[[t]], breaks = 50, freq = FALSE, col=col1)
-  hist(cor.gwr[[t]], breaks = 50, freq = FALSE, add = TRUE, col=col2)
-  if(t == n.season)
-    legend("topleft", legend = c("OLS","GWR"),
-           fill = c(col1,col2),
-           bty = 'n',cex = 0.75,
-           border = NA)
-}
-
-########################################
-############## test code ###############
-########################################
-
-## Gaussian kernel d_gauss[1]]=0.2
-w4 = gwr.Gauss(distance^2,d_gauss[1])
-fit_m4_1 = varw_fixed(tas_exp,p=0,xt = x_mult[,-3,],w = w4,fixed = fixed_beta1)
-fit_m4_2 = varw_fixed(tas_exp,p=0,xt = x_mult[,-1,],w = w4,fixed = fixed_beta1)
-fit_m4_3 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w4,fixed = fixed_beta2)
-fit_m4_4 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w4,fixed = fixed_beta3)
-w_b0_est4 = t(fit_m4_3$coef[1,,])
-w_slope_est4 = t(fit_m4_3$coef[2,,])
-w_h_est4 = t(fit_m4_3$coef[3,,])
-w_sea_est4 = cbind(fit_m4_3$coef[4,1,],fit_m4_3$coef[5,2,],
-                   fit_m4_3$coef[6,3,],fit_m4_3$coef[7,4,])
-
-w_b0_se4 = t(fit_m4_3$se.coef[1,,])
-w_slope_se4 = t(fit_m4_3$se.coef[2,,])
-w_h_se4 = t(fit_m4_3$se.coef[3,,])
-w_sea_se4 = cbind(fit_m4_3$se.coef[4,1,],fit_m4_3$se.coef[5,2,],
-                  fit_m4_3$se.coef[6,3,],fit_m4_3$se.coef[7,4,])
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_b0_est4,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated intercept (C) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-ceiling(max(abs(w_b0_est2))),ceiling(max(abs(w_b0_est2)))),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_slope_est4,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slope (C/decade) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-0.5,0.5),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_h_est2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated elevation slope (C/m) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-23,23),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          w_sea_est2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated seasonal correaltion (C/C) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-3,3),
-          legend = "vertical")
-
-## z-scores
-z_score = list(b0_z = w_b0_est2/w_b0_se2,
-               slope_z = w_slope_est2/w_slope_se2,
-               h_z = w_h_est2/w_h_se2,
-               sea_z = w_sea_est2/w_sea_se2)
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score$slope_z,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z scores of time slope of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-6,6),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score$h_z,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z scores of elevation slope of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(-10,10),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          z_score$sea_z,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z scores of seasonal correlation of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          #zlim = c(-0.32,0.32),
-          zlim = c(0,18),
-          legend = "vertical")
-
-
-
-
-
-
-
-
-#############test code###################
-## comparing estimated slopes
-cmap <- colorRampPalette(rev(brewer.pal(11, "RdBu")))
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          w_beta_est,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slopes (C/decade) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-0.32,0.32),
-          legend = "vertical")
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          w_beta_est2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slopes (C/decade) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-0.32,0.32),
-          legend = "vertical")
-
-## comparing z_score
-z_score1 = w_beta_est/w_beta_se
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          z_score1,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z_scores of estimated slopes of four seasons",
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2,2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-4.5,4.5),
-          legend = "vertical")
-
-z_score2 = w_beta_est2/w_beta_se2
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          z_score2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z_scores of estimated slopes of four seasons",
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2,2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-4.5,4.5),
-          legend = "vertical")
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          w_ele_est2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slopes (elevation) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-0.03,0.03),
-          legend = "vertical")
-
-z_score = w_ele_est2/w_ele_se2
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          z_score,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Z_scores of estimated slopes (elevation) of four seasons",
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2,2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-80,80),
-          legend = "vertical")
-
-## Gaussian kernel
-w4 = gwr.Gauss(distance^2,d[3])
-fit_m4_1 = varw_fixed(tas_exp,p=0,xt = x_mult[,-3,],w = w4,fixed = fixed_beta1)
-fit_m4_2 = varw_fixed(tas_exp,p=0,xt = x_mult[,-1,],w = w4,fixed = fixed_beta1)
-fit_m4_3 = varw_fixed(tas_exp,p=0,xt = x_mult[,-3,],w = w4,fixed = fixed_beta2)
-fit_m4_4 = varw_fixed(tas_exp,p=0,xt = x_mult[,-1,],w = w4,fixed = fixed_beta2)
-w_beta_est4 = t(fit_m4_4$coef[1,,])
-w_beta_se4 = t(fit_m4$se.coef[1,,])
-w_ele_est4 = t(fit_m4$coef[2,,])
-w_ele_se4 = t(fit_m4$se.coef[2,,])
-
-## comparing estimated slopes
-cmap <- colorRampPalette(rev(brewer.pal(11, "RdBu")))
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          w_beta_est4,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slopes (C/decade) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-0.32,0.32),
-          legend = "vertical")
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(co_elevation$longitude,co_elevation$latitude,
-          w_beta_est2,
-          # interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Estimated slopes (C/decade) of four seasons",
-          mtext.args = list(cex = 1),
-          #text = as,
-          #text.args = list(cex=1),
-          legend.axis.args = list(cex.axis=1),
-          size = c(2, 2), lratio = 0.25,
-          col=cmap(200),
-          zlim = c(-0.32,0.32),
-          legend = "vertical")
-
-##### pacakge checking
-gwr.bl = gwr.sel(summer ~ time.pts, gls.tas.summary,
-                 coords = cbind(gls.tas.summary$lon,gls.tas.summary$lat),
-                 adapt = TRUE, longlat = TRUE)
-gwr.bl2 = gwr(summer ~ time.pts, gls.tas.summary,verbose = TRUE,
-              coords = as.matrix(gls.tas.summary$elevation),
-              adapt = TRUE, longlat = TRUE)
-gwr.model = gwr(Leaf.ec~Year,data=chinensis2,
-                bandwidth=750000,fit.points=us_grid2)
 

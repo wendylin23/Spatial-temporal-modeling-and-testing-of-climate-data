@@ -1,4 +1,4 @@
-## NA-CORDEX Util.R
+## NA-CORDEX Util.R 
 
 ## Durbin-Watson test statistic using residuals
 durbinWatsonTest.r <- function(resid, max.lag=1){

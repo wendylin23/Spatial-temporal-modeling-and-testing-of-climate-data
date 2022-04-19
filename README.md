@@ -1,5 +1,9 @@
 # Spatial-temporal modeling and testing of climate data
 
+R codes for statistical analysis performed in manuscript "Spatial-Temporal Modeling and Spatial Inference Using NA-CORDEX Climate Data".
+
+
+
 <!-- CONTACT -->
 ## Contact
 

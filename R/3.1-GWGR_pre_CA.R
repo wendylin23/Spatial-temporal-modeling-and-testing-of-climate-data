@@ -23,7 +23,9 @@ library(rgbif)
 library(mgcv)
 library(mgcViz)
 library(lctools)
-code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
+code_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/R/"
+data_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Data" 
+res_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Results"
 setwd(code_path)
 source(paste0(code_path,"gwr.R"))
 source(paste0(code_path,"varx_fixed.R"))
@@ -32,20 +34,15 @@ source(paste0(code_path,"util.R"))
 #####################################
 ############## Load data ############
 #####################################
-tas_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/tas-rec-rcp85-mon-44i/"
-pr_path = "/Users/wenyilin/Documents/R/NA-CORDEX/data/rds/pr-rec-rcp85-mon-44i/"
-map_path = "/Users/wenyilin/Documents/R/NA-CORDEX/map/"
+map_path = paste0(data_path,'/map/')
 within_ca = readRDS(file = paste0(map_path,"within_ca.rds"))
 load(paste0(map_path,"within_rec_ca.rdata"))
 load(paste0(map_path,"ca_elevation_rec.rdata"))
-load("/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/reports/ca_geodata.rdata")
+load(paste0(map_path,"ca_geodata.rdata"))
 
-### list files in CA
-pr_hist_ca_all = list.files(path = pr_path,pattern = "^pr_ca_pr.hist")
-pr_rcp_ca_all = list.files(path = pr_path,pattern = "^pr_ca_pr.rcp85")
 ### example analysis for CA
-pr_hist_ca = readRDS(file = paste0(pr_path,pr_hist_ca_all[1]))
-pr_rcp_ca = readRDS(file = paste0(pr_path,pr_rcp_ca_all[1]))
+pr_hist_ca = readRDS(file = paste0(data_path,'/pre_tas/pr_ca_prec.hist.CanESM2.CanRCM4.mon.NAM-44i.raw.nc.rds'))
+pr_rcp_ca = readRDS(file = paste0(data_path,'/pre_tas/pr_ca_prec.rcp85.CanESM2.CanRCM4.mon.NAM-44i.raw.nc.rds'))
 
 ## find non-ocean area
 coords_ca$ind = 1

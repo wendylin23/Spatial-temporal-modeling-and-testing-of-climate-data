@@ -14,6 +14,7 @@ setwd(data_path)
 
 # determine which coords are in each state polygon
 map_path = paste0(data_path,'/map/')
+load(paste0(map_path,"within_rec_ca.rdata"))
 within_ca = readRDS(file = paste0(map_path,"within_ca.rds"))
 within_co = readRDS(file = paste0(map_path,"within_co.rds"))
 within_ks = readRDS(file = paste0(map_path,"within_ks.rds"))

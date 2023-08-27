@@ -424,7 +424,18 @@ cor.rsquare
 
 ## 3 Constructing GWMTSR 
 d_bis = seq(1,10,by = 0.5)
-w2 = gwr.lm(distance,d_bis[])
+w2 = gwr.lm(distance,2)
+fixed_beta1 = rbind(matrix(1,nrow = 3,ncol = 4),diag(1,4)) ## Cross-season effect included in the model
+fixed_beta0 = rbind(matrix(1,nrow = 3,ncol = 4),diag(0,4)) ## no cross-season effect
+ca_tas_w = varw_fixed(tas_exp,p=0,xt = x_mult,w = w2,fixed = fixed_beta1) ## selected weight matrix
+ca_tas_pre_w = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta1)
+ca_tas_pre_w0 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta0) ## fit future data with no cross-season effect
+
+## Save data to local directory for figure generation
+ca_tas_coef = list(ca_tas_nw = ca_tas_nw,
+                   ca_tas_w = ca_tas_w,
+                   ca_tas_pre = ca_tas_pre_w)
+# save(ca_tas_coef,file = "yourdatapath/ca_tas_coef.rdata")
 
 ### Model selection via AIC
 fixed_beta2 = rbind(matrix(1,nrow = 3,ncol = 4),diag(1,4))
@@ -507,56 +518,10 @@ for(i in 1:n.fold)
   #}## d=1.6
 }
 
-## Bisquare kernel d_bis[2]=1.1
-fixed_beta2 = rbind(matrix(1,nrow = 3,ncol = 4),diag(1,4))
-fixed_beta3 = rbind(matrix(1,nrow = 3,ncol = 4),diag(0,4))
-fixed_beta4 = rbind(matrix(1,nrow = 2,ncol = 4),rep(0,4),diag(1,4))
-w1 = gwr.bisquare(distance^2,4)
-w2 = gwr.lm(distance,2)
-w3 = gwr.exp(distance, 1.5)
-w4 = gwr.gauss(distance^2,2)
-
-fixed_beta0 = rbind(matrix(1,nrow = 3,ncol = 4),diag(0,4))
-fit_m3_2 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w2,fixed = fixed_beta2) ## selected weight matrix
-### Fit the model with future data
-pred_m3_2 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta2)
-pred_m3_beta0 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta0)
-pred_m3_w3_beta0 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta0)
-pred_m3_w0_beta0 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w0,fixed = fixed_beta0)
-
-### Future data Model selection via AIC
-d_bis = seq(0.5,5,by = 0.5)
-fixed_beta2 = rbind(matrix(1,nrow = 3,ncol = 4),diag(1,4))
-fixed_beta3 = rbind(matrix(1,nrow = 3,ncol = 4),diag(0,4))
-fixed_beta4 = rbind(matrix(1,nrow = 2,ncol = 4),rep(0,4),diag(1,4))
-aic.bisquare.w1 = aic.bisquare.w2 = matrix(0, nrow = 4, ncol = length(d_bis))
-for(j in 1:length(d_bis))
-{
-  w2 = gwr.lm(distance,d_bis[j])
-  fit_t2 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta2)
-  fit_t3 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta3)
-  fit_t4 = varw_fixed(tas_rcp,p=0,xt = x_rcp,w = w2,fixed = fixed_beta4)
-  aic.bisquare.w2[,j] = fit_t2$aic
-  print(fit_t2$aic)
-}## d=1.6
-
-d_gauss = seq(1,10,by = 0.5)
-aic.gauss.w3 = aic.gauss.w4 = matrix(0, nrow = 4, ncol = length(d_gauss))
-for(j in 1:length(d_gauss))
-{
-  print(j)
-  w3 = gwr.exp(distance, d_gauss[j] )
-  w4 = gwr.gauss(distance^2,d_gauss[j])
-  fit_t3 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w3,fixed = fixed_beta2)
-  fit_t4 = varw_fixed(tas_exp,p=0,xt = x_mult,w = w4,fixed = fixed_beta2)
-  aic.gauss.w3[,j] = fit_t3$aic
-  aic.gauss.w4[,j] = fit_t4$aic
-}## d[6]=0.6
-
 ## Prediction with future data
-rcp_pred = pred.dat(x_rcp, pred_m3_2$coef)
-rcp_beta0_pred = pred.dat(x_rcp, pred_m3_beta0$coef)
-dat_pred = pred.dat(x_mult, fit_m3_2$coef)
+rcp_pred = pred.dat(x_rcp, ca_tas_w$coef)
+rcp_beta0_pred = pred.dat(x_rcp, ca_tas_pre_w0$coef)
+dat_pred = pred.dat(x_mult, ca_tas_w$coef)
 
 ## current prediction
 par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))

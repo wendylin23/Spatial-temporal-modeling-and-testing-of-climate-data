@@ -23,10 +23,10 @@ co_poly = readRDS(file = paste0(map_path,"co_poly.rds"))
 ks_poly = readRDS(file = paste0(map_path,"ks_poly.rds"))
 
 # create sf coords of lon/lat
-dtf = expand.grid(lon, lat)
-names(dtf) = c("lon", "lat")
-coords = sf::st_as_sf(dtf, coords = c("lon", "lat"),
-                      crs = sf::st_crs(ks_poly))
+# dtf = expand.grid(lon, lat)
+# names(dtf) = c("lon", "lat")
+# coords = sf::st_as_sf(dtf, coords = c("lon", "lat"),
+#                       crs = sf::st_crs(ks_poly))
 # save data in .rds
 all_files = list.files(path = paste0(data_path,'/climate_data/pr/')) # change the path to temperature data if working on it
 setwd(paste0(data_path,'/climate_data/pr'))
@@ -45,8 +45,8 @@ for (i in seq_along(all_files)) {
   # extract relevant data for each state
   #tas = matrix(c(tas) - 273.15, ncol = dim(tas)[3]) # col: time
   tmp = matrix(c(tmp), ncol = dim(tmp)[3]) 
-  coords_ca = coords[within_ca,]
-  tmp_ca = tmp[within_ca, ]
+  coords_ca = coords[within_rec_ca,]
+  tmp_ca = tmp[within_rec_ca, ]
   coords_co = coords[within_co,]
   tmp_co = tmp[within_co, ]
   coords_ks = coords[within_ks,]

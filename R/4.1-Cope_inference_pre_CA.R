@@ -7,7 +7,9 @@ library(fields)
 library(maps)
 library(RColorBrewer)
 library(car)
-code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
+code_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/R/"
+data_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Data" 
+res_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Results"
 setwd(code_path)
 source(paste0(code_path,"gwr.R"))
 source(paste0(code_path,"varx_fixed.R"))

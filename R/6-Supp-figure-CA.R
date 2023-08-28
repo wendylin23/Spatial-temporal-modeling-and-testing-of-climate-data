@@ -29,7 +29,6 @@ library(mgcv)
 library(mgcViz)
 library(lctools)
 library(car)
-source("~/Dropbox/UCSD/Thesis/3.Precipitation/Code/util.R")
 ## color map for parameters
 #cmap <- colorRampPalette(rev(brewer.pal(11, "RdBu")))
 cmap = colorRampPalette(rev((brewer.pal(11, "RdBu"))[3:9])) 
@@ -41,22 +40,30 @@ pr.cmap <- colorRampPalette(brewer.pal(11, "Spectral")[6:11])
 tas.cmap <- colorRampPalette(rev(brewer.pal(11, "Spectral"))[1:6])
 ele.cmap <- colorRampPalette(terrain.colors(10, alpha = 1))
 
-res_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/summary_results_20211101/"
-code_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/"
-pic_path = "/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Figures/20220315_supp"
+code_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/R/"
+data_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Data" 
+res_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Results"
+pic_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Figures"
+setwd(code_path)
+source(paste0(code_path,"gwr.R"))
+source(paste0(code_path,"varx_fixed.R"))
+source(paste0(code_path,"util.R"))
+
+#####################################
+##### Load and prepare data #########
+#####################################
+map_path = paste0(data_path,'/map/')
+within_ca = readRDS(file = paste0(map_path,"within_ca.rds"))
+load(paste0(map_path,"within_rec_ca.rdata"))
+load(paste0(map_path,"ca_elevation_rec.rdata"))
+load(paste0(map_path,"ca_geodata.rdata"))
+load(paste0(res_path,"ca_data.rdata"))
+load(paste0(res_path,"ca_slope_v_new.rdata"))
+load(paste0(res_path,"ca_pre_coef.rdata"))
+load(paste0(res_path,"ca_tas_coef.rdata"))
+ca_elevation = ca_data$ca_elevation
 season.var = c("winter","spring","summer","fall" )
 n.season = length(season.var)
-
-
-## get aspect ratio from lon/lat
-map_aspect = function(x, y) {
-  x.center = sum(range(x)) / 2
-  y.center = sum(range(y)) / 2
-  x.dist = ggplot2:::dist_central_angle(x.center + c(-0.5, 0.5), rep(y.center, 2))
-  y.dist = ggplot2:::dist_central_angle(rep(x.center, 2), y.center + c(-0.5, 0.5))
-  ratio = y.dist / x.dist
-  diff(range(y)) / diff(range(x)) * ratio
-}
 
 plot_list = function(x, main = "", xlab = ""){
   maxy = sapply(x, function(j) j$y)
@@ -70,9 +77,6 @@ plot_list = function(x, main = "", xlab = ""){
 ##########################################
 #### Supplementary Figures for CA ####
 ##########################################
-
-load(paste0(res_path,"ca_data.rdata"))
-ca_elevation = ca_data$ca_elevation
 season.var = c("winter","spring","summer","fall" )
 loc.names = c("San Francisco","San Diego","Yosemite","Death Valley")
 select.loc = data.frame(sf = c(37.75,-122.25), sd = c(32.75,-117.25),
@@ -83,72 +87,6 @@ season.var = c("winter","spring","summer","fall")
 sub.loc = list(x = c(-122.25, -117.25, -119.25, -116.75), 
                y = c(37.75,32.75,37.75,36.25),
                labels = loc.names)
-
-load(paste0(res_path,"ca_slope_v_new.rdata"))
-load(paste0(res_path,"ca_pre_coef.rdata"))
-load(paste0(res_path,"ca_tas_coef.rdata"))
-
-## Hist - temp
-#jpeg(paste0(pic_path,"/Plot3.jpeg"), width = 600, height = 600, units = 'mm', res = 300)
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-Simul_Cope(map = ca_elevation, par = slope_new$slope_hist$beta_w_tau,
-           par.se =  slope_new$slope_hist$sigma_w_tau,
-           resids = ca_tas_coef$ca_tas_w$residuals,
-           level.set = c(0.1,0.15,0.2), zlim = c(0,0.6),
-           col.map = pos_cmap(200),
-           sub.loc=sub.loc, select.ind = select.ind)
-#dev.off()
-
-## Hist - pre
-Simul_Cope(map = ca_elevation, par = gwgr.pre.ca$res.gwgr$gwgr.slope,
-           par.se =  gwgr.pre.ca$res.gwgr$gwgr.slope.se,
-           resids = gwgr.pre.ca$res.gwgr$dat_resid,
-           level.set = c(-0.05,0,0.05), zlim = c(-0.2,0.2),
-           col.map = rev.cmap(200),type = "prep",
-           sub.loc=sub.loc, select.ind = select.ind)
-
-## RCP - temp
-Simul_Cope(map = ca_elevation, par = slope_new$slope_rcp$beta_w_rcp_tau,
-           par.se =  slope_new$slope_rcp$sigma_w_rcp_tau,
-           resids = ca_tas_coef$ca_tas_pre$residuals,
-           level.set = c(0.5,0.55,0.6), zlim = c(0.4,1),
-           col.map = pos_cmap(200),
-           sub.loc=sub.loc, select.ind = select.ind)
-
-## RCP - pre
-Simul_Cope(map = ca_elevation, par = gwgr.pre.ca$future.gwgr$gwgr.slope,
-           par.se =  gwgr.pre.ca$future.gwgr$gwgr.slope.se,
-           resids = gwgr.pre.ca$future.gwgr$dat_resid,
-           level.set = c(-0.05,0,0.05), zlim = c(-0.25,0.25),
-           col.map = rev.cmap(200),type = "prep",
-           sub.loc=sub.loc, select.ind = select.ind)
-
-
-# map of elevation 1.13:1
-par(oma = c(1, 1, 1, 1), mar = c(1, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          ca_elevation$elevation_geonames,
-          interp.args = list(no.X = 200, no.Y = 200),
-          common.legend = FALSE,
-          #proj="albers",par=c(30,40),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = c("Elevation (m) in CA"),
-          points = sub.loc,
-          points.args = list(pch = 20, col = "white"),
-          text = sub.loc,
-          text.args = list(pos = 3, col = "white",cex=0.9),
-          mtext.args = list(cex = 1),
-          col=ele.cmap(200),
-          legend.axis.args = list(cex.axis=1),
-          lratio = 0.2,
-          legend = "vertical")
-
-### 2. Data visualization
-#### Temperature
-load(paste0(res_path,"ca_pre_coef.rdata"))
-load(paste0(res_path,"ca_tas_coef.rdata"))
-#load(paste0(res_path,"ca_tas_cv.rdata"))
-#load(paste0(res_path,"ca_tas_aic_w2.rdata"))
 
 time_dat = data.frame(year = rep(1950:2005,each=12),
                       month = rep(1:12,56),
@@ -180,85 +118,6 @@ gls.tas.all = rbind(gls.tas.summary,gls.tas.summary)
 gls.pr.summary$time.pts = time.pts
 gls.pr.rcp$time.pts = time.rcp.pts
 gls.pr.all = rbind(gls.pr.summary,gls.pr.rcp)
-
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          gls.tas.summary[gls.tas.summary$year==1992,season.var],
-          interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Average seasonal temperature (C) in 1992",
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          points = sub.loc,
-          points.args = list(pch = 20, col = "white"),
-          text = sub.loc,
-          text.args = list(pos = 3, col = "darkred",cex=1.1),
-          zlim = c(-12,32),
-          col=tas.cmap(200),
-          size = c(2, 2), lratio = 0.2,
-          legend = "vertical")
-
-## temporal seasonal trend (plus future)
-par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
-for(s in 1:length(select.ind))
-{
-  tas.dat = ts(gls.tas.summary[gls.tas.summary$loc==select.ind[s],season.var[1]],start = 1950)
-  plot(tas.dat, xlim = c(1950,2100),ylim = range(gls.tas.all[,season.var]), main = loc.names[s],
-       xlab = "Year", ylab = "Average temperature")
-  tas.dat = ts(gls.tas.rcp[gls.tas.rcp$loc==select.ind[s],season.var[1]],start = 2006)
-  lines(tas.dat, lty=3)
-  for(i in 2: length(season.var))
-  {
-    tas.dat = ts(gls.tas.summary[gls.tas.summary$loc==select.ind[s],season.var[i]],start = 1950)
-    lines(tas.dat, ylim = range(gls.tas.summary[,season.var]),col=i)
-    tas.dat = ts(gls.tas.rcp[gls.tas.rcp$loc==select.ind[s],season.var[i]],start = 2006)
-    lines(tas.dat, lty=3,col=i)
-  }
-}
-legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
-       legend=season.var,lty = 1, col=1:length(season.var))
-mtext("Average seasonal temperature (C) at four typical locations", outer = TRUE, cex = 1.2)
-
-#### Precipitation
-par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
-autoimage(ca_elevation$longitude,ca_elevation$latitude,
-          gls.pr.summary[gls.pr.summary$year==1992,season.var],
-          interp.args = list(no.X = 200, no.Y = 200),
-          map = "county",ylab = "Latitude",xlab = "Longitude",
-          main = season.var,
-          outer.title = "Average seasonal precipitation (mm/month) in 1992",
-          mtext.args = list(cex = 1),
-          legend.axis.args = list(cex.axis=1),
-          points = sub.loc,
-          points.args = list(pch = 20, col = "white"),
-          text = sub.loc,
-          text.args = list(pos = 3, col = "darkred",cex=1.1),
-          zlim = c(0,180),
-          col=pr.cmap(200),
-          size = c(2, 2), lratio = 0.2,
-          legend = "vertical")
-
-### combined with future
-par(mfrow = c(2,2), oma=c(1, 1, 2,5),  mar = c(2, 2, 2, 2))
-for(s in 1:length(select.ind))
-{
-  tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[1]],start = 1950)
-  plot(tas.dat, xlim = c(1950,2100),ylim = range(gls.pr.all[,season.var]), main = loc.names[s],
-       xlab = "Year", ylab = "Average precipitation")
-  tas.dat = ts(gls.pr.rcp[gls.pr.rcp$loc==select.ind[s],season.var[1]],start = 2006)
-  lines(tas.dat, lty=3)
-  for(i in 2: length(season.var))
-  {
-    tas.dat = ts(gls.pr.summary[gls.pr.summary$loc==select.ind[s],season.var[i]],start = 1950)
-    lines(tas.dat,col=i)
-    tas.dat = ts(gls.pr.rcp[gls.pr.rcp$loc==select.ind[s],season.var[i]],start = 2006)
-    lines(tas.dat, lty=3,col=i)
-  }
-}
-legend(par('usr')[2], par('usr')[4], bty='n', xpd=NA,cex = 1.1,
-       legend=season.var,lty = 1, col=1:length(season.var))
-mtext("Average seasonal precipitation (mm/month) at four typical locations", outer = TRUE, cex = 1)
 
 
 ### 3. Correlation checking

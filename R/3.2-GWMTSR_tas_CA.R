@@ -159,7 +159,6 @@ gls.tas.summary$time.pts = time.pts
 gls.tas.rcp$time.pts = time.rcp.pts
 gls.tas.all = rbind(gls.tas.summary,gls.tas.rcp)
 
-
 ## spatial seasonal trend
 par(oma = c(0, 0, 3, 0), mar = c(2, 1, 1, 1))
 autoimage(ca_elevation$longitude,ca_elevation$latitude,

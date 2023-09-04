@@ -1,3 +1,7 @@
+###########################################################################################
+## This code file provides the analysis pipeline for precipitation data in CA
+###########################################################################################
+
 rm(list=ls())
 library(forecast)
 library(reshape2)

@@ -1,3 +1,13 @@
+#######################################################################################
+## This code file provide the source code to read and transform downloaded data
+## Raw Data can be downloaded from https://www.earthsystemgrid.org/search/cordexsearch.html
+## Check the box in each column to select subset specified in this work
+## CLick 'Download Options for Selection'
+## Click 'Download Curl Script' and run the script from command line to install .nc data
+## Save the downloaded data to local directory and using the below code to extract and 
+## tranform data at state level.
+#######################################################################################
+
 rm(list=ls())
 library(reshape2)
 library(ncdf4)

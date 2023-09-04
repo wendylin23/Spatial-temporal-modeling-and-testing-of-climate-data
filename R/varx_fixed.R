@@ -1,3 +1,7 @@
+###########################################################################################
+## This code file provides the function for non-weighted model for temperature data
+###########################################################################################
+
 library(matlib)
 
 varx_fixed = function(zt,p,xt,fixed=NULL,m=0,include.mean=T)

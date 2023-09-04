@@ -1,3 +1,7 @@
+###########################################################################################
+## This code file provides the analysis pipeline for temperature data in CA
+###########################################################################################
+
 rm(list=ls())
 library(forecast)
 library(reshape2)

@@ -1,4 +1,7 @@
-###### Packages and functions #####
+###########################################################################################
+## This file provides the code for producing all figures included in the manuscript
+###########################################################################################
+
 rm(list=ls())
 library(forecast)
 library(reshape2)

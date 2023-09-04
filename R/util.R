@@ -1,4 +1,6 @@
-## NA-CORDEX Util.R 
+###########################################################################################
+## This code file provides utility functions
+###########################################################################################
 
 ## Durbin-Watson test statistic using residuals
 durbinWatsonTest.r <- function(resid, max.lag=1){

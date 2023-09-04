@@ -1,3 +1,7 @@
+###########################################################################################
+## This file provides the code for deriving the temperature slope parameter
+###########################################################################################
+
 rm(list=ls())
 library(forecast)
 library(reshape2)

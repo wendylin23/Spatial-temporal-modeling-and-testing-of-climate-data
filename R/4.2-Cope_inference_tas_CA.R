@@ -1,3 +1,7 @@
+###########################################################################################
+## This code file provides the analysis pipeline for deriving COPE set for temperature data
+###########################################################################################
+
 rm(list=ls())
 library(grDevices)
 library(cope)

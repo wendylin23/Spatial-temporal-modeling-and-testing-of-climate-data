@@ -1,3 +1,8 @@
+###########################################################################################
+## This code file provides the pipeline to preprocess and save climate for further analysis
+## Only the analysis code for California climate was provided 
+###########################################################################################
+
 #####################################
 ########## Load packages ############
 #####################################

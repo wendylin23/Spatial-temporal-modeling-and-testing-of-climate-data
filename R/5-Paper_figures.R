@@ -35,7 +35,7 @@ library(car)
 
 code_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/R/"
 data_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Data" 
-res_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Results"
+res_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Data/Results/"
 pic_path = "/Users/wenyilin/Documents/GitHub/Spatial-temporal-modeling-and-testing-of-climate-data/Figures"
 setwd(code_path)
 source(paste0(code_path,"gwr.R"))
@@ -75,6 +75,7 @@ load(paste0(res_path,"ca_data.rdata"))
 load(paste0(res_path,"ca_slope_v_new.rdata"))
 load(paste0(res_path,"ca_pre_coef.rdata"))
 load(paste0(res_path,"ca_tas_coef.rdata"))
+load(paste0(res_path,"ca_pre_dw_p.rdata"))
 ca_elevation = ca_data$ca_elevation
 season.var = c("winter","spring","summer","fall" )
 n.season = length(season.var)
@@ -392,8 +393,6 @@ mtext("Empirical CDFs of the p values from Ljung-Box test of autocorrelation", o
 
 #### Precipitation
 #### 3.2.2 Autocorrelation check
-load("/Users/wenyilin/Dropbox/UCSD/Thesis/3.Precipitation/Code/results/ca_pre_dw_p.rdata")
-
 par(mfrow = c(2,2), oma=c(1, 1, 1,5),  mar = c(2, 2, 2, 2))
 ecdf.prop = seq(0.01, 0.99, len = 99)
 for(s in 1:n.season)
@@ -433,9 +432,6 @@ boxplot(multi.pval,ylab = "p-value of coefficients")
 abline(h=0.05,col="red")
 
 #### 4 temporal modeling
-load(paste0(res_path,"ca_slope_v_new.rdata"))
-load(paste0(res_path,"ca_pre_coef.rdata"))
-load(paste0(res_path,"ca_tas_coef.rdata"))
 
 ### temperature (time trend variable)
 beta_est = ca_tas_coef$ca_tas_nw$beta_est
